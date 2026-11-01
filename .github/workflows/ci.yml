@@ -33,6 +33,24 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt pytest
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate inline browser JavaScript syntax
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          html = Path("web/index.html").read_text(encoding="utf-8")
+          scripts = re.findall(r"<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.I | re.S)
+          if not scripts:
+              raise SystemExit("No inline JavaScript found in web/index.html")
+          Path("/tmp/sentinel-inline.js").write_text("\n".join(scripts), encoding="utf-8")
+          PY
+          node --check /tmp/sentinel-inline.js
+
       - name: Validate Python syntax
         run: |
           python -m py_compile backend/app.py python/gps_core.py python/settings.py

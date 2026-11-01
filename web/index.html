@@ -673,6 +673,16 @@
       }
 
       // Renderização Hiper-Realista 3D do Globo Terra
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, character => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        })[character]);
+      }
+
       const globe = Globe()(document.getElementById('globe'))
         .globeImageUrl(textures[currentTexture])
         .bumpImageUrl('https://unpkg.com/three-globe@2.43.0/example/img/earth-topology.png')
@@ -681,10 +691,10 @@
         .atmosphereColor('#38bdf8')
         .atmosphereAltitude(0.25)
         .pointLat('lat').pointLng('lng').pointAltitude('altitude').pointColor('color').pointRadius(0.5)
-        .pointLabel(d => `<div style="background:rgba(15,23,42,0.92);padding:6px 10px;border-radius:8px;border:1px solid rgba(56,189,248,0.35);font-family:sans-serif;font-size:12px;box-shadow:0 8px 16px rgba(0,0,0,0.5);"><b>${d.label}</b><br><span style="color:#94a3b8;font-size:10px;">${d.type === 'earthquake' ? 'USGS · Fonte Pública' : d.type.toUpperCase() + ' · Ativo Tático'}</span></div>`)
+        .pointLabel(d => `<div style="background:rgba(15,23,42,0.92);padding:6px 10px;border-radius:8px;border:1px solid rgba(56,189,248,0.35);font-family:sans-serif;font-size:12px;box-shadow:0 8px 16px rgba(0,0,0,0.5);"><b>${escapeHtml(d.label)}</b><br><span style="color:#94a3b8;font-size:10px;">${escapeHtml(d.type === 'earthquake' ? 'USGS · Fonte Pública' : String(d.type).toUpperCase() + ' · Ativo Tático')}</span></div>`)
         .onPointClick(asset => {
           const inspector = document.getElementById('inspector');
-          inspector.innerHTML = `<strong>${asset.label}</strong><small>TIPO: ${asset.type.toUpperCase()}<br>LAT: ${asset.lat.toFixed(4)}<br>LNG: ${asset.lng.toFixed(4)}<br>FONTE: ${asset.type === 'earthquake' ? 'USGS' : 'Demonstração'}</small>`;
+          inspector.innerHTML = `<strong>${escapeHtml(asset.label)}</strong><small>TIPO: ${escapeHtml(String(asset.type).toUpperCase())}<br>LAT: ${asset.lat.toFixed(4)}<br>LNG: ${asset.lng.toFixed(4)}<br>FONTE: ${asset.type === 'earthquake' ? 'USGS' : 'Demonstração'}</small>`;
           inspector.hidden = false;
         })
         .onGlobeClick(async ({ lat, lng }) => {
@@ -698,21 +708,21 @@
 
             let companiesList = '';
             if (data.business && data.business.sample_companies && data.business.sample_companies.length > 0) {
-              companiesList = data.business.sample_companies.map(c => `• ${c.name} (${c.category})`).join('<br>');
+              companiesList = data.business.sample_companies.map(c => `• ${escapeHtml(c.name)} (${escapeHtml(c.category)})`).join('<br>');
             } else {
               companiesList = 'Nenhuma grande empresa ou POI registrado neste raio.';
             }
 
             inspector.innerHTML = `
-              <strong>📍 ${data.city !== 'N/A' ? data.city : data.country}</strong>
-              <small style="color:var(--cyan);font-weight:600;">${data.display_name}</small>
+              <strong>📍 ${escapeHtml(data.city !== 'N/A' ? data.city : data.country)}</strong>
+              <small style="color:var(--cyan);font-weight:600;">${escapeHtml(data.display_name)}</small>
               <hr style="border:0;border-top:1px solid var(--panel-border);margin:8px 0;">
               <small>
-                <b>🌍 PAÍS:</b> ${data.country}<br>
-                <b>🏛️ ESTADO / REGIÃO:</b> ${data.state}<br>
-                <b>🏙️ CIDADE / VILA:</b> ${data.city}<br>
+                <b>🌍 PAÍS:</b> ${escapeHtml(data.country)}<br>
+                <b>🏛️ ESTADO / REGIÃO:</b> ${escapeHtml(data.state)}<br>
+                <b>🏙️ CIDADE / VILA:</b> ${escapeHtml(data.city)}<br>
                 <b>👥 HABITANTES ESTIMADOS:</b> <span style="color:var(--green);font-weight:700;">${data.demographics.estimated_population > 0 ? data.demographics.estimated_population.toLocaleString('pt-BR') + ' pessoas' : 'Área remota / Oceano'}</span><br>
-                <b>📊 DENSIDADE:</b> ${data.demographics.density_description}<br>
+                <b>📊 DENSIDADE:</b> ${escapeHtml(data.demographics.density_description)}<br>
                 <br>
                 <b>🏢 EMPRESAS & COMÉRCIO PRÓXIMO:</b> (${data.business.nearby_count} detectados)<br>
                 <span style="color:#cbd5e1;">${companiesList}</span>

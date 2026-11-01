@@ -718,6 +718,38 @@
                 <span style="color:#cbd5e1;">${companiesList}</span>
               </small>
             `;
+
+            const mapDetails = document.createElement('div');
+            mapDetails.style.cssText = 'margin-top:10px;padding-top:8px;border-top:1px solid var(--panel-border);';
+            const mapHeading = document.createElement('strong');
+            mapHeading.textContent = '🗺️ OBJETOS MAPEADOS PRÓXIMOS';
+            mapDetails.appendChild(mapHeading);
+            const mapSummary = document.createElement('small');
+            mapSummary.textContent = 'Consultando edifícios, vias, transporte e locais públicos…';
+            mapDetails.appendChild(mapSummary);
+            inspector.appendChild(mapDetails);
+
+            fetch(`/api/map/features?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&radius=500`)
+              .then(response => {
+                if (!response.ok) throw new Error('Fonte cartográfica indisponível');
+                return response.json();
+              })
+              .then(mapData => {
+                mapSummary.textContent = `OpenStreetMap · raio de ${mapData.radius_meters} m · ${mapData.count} elementos mapeados\nEdifícios: ${mapData.counts.buildings} · Vias: ${mapData.counts.roads} · Transporte: ${mapData.counts.transport} · Outros locais: ${mapData.counts.places}\nAtualizado em: ${new Date(mapData.updated_at * 1000).toLocaleTimeString()}`;
+                const list = document.createElement('small');
+                list.style.cssText = 'display:block;margin-top:6px;color:#cbd5e1;white-space:pre-wrap;';
+                const sample = mapData.items.slice(0, 12).map(item => `• ${item.name} [${item.kind}]`);
+                list.textContent = sample.length ? sample.join('\n') : 'Nenhum elemento encontrado neste raio.';
+                mapDetails.appendChild(list);
+                if (mapData.count > sample.length) {
+                  const more = document.createElement('small');
+                  more.textContent = `\nExibindo ${sample.length} de ${mapData.count} elementos encontrados.`;
+                  mapDetails.appendChild(more);
+                }
+              })
+              .catch(() => {
+                mapSummary.textContent = 'OpenStreetMap indisponível no momento. Tente novamente mais tarde.';
+              });
           } catch (err) {
             inspector.innerHTML = `<strong>📍 Localização Selecionada</strong><small>LAT: ${lat.toFixed(4)}° | LNG: ${lng.toFixed(4)}°<br><span style="color:var(--red);">Erro ao obter dados detalhados da região.</span></small>`;
           }

@@ -15,7 +15,8 @@
       "command": "git",
       "args": [
         "status",
-        "--short --branch"
+        "--short",
+        "--branch"
       ],
       "problemMatcher": []
     },

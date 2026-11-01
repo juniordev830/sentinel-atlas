@@ -168,3 +168,8 @@ Se algum comando falhar, confira as dependências instaladas e a configuração 
 ---
 
 Este repositório é um projeto de portfólio em evolução. Recursos e integrações devem ser avaliados conforme o código e a configuração disponíveis na versão atual.
+
+
+## Segurança para produção
+
+A API exige a variável SENTINEL_API_TOKEN com pelo menos 32 caracteres quando SENTINEL_ENV=production; a aplicação falha na inicialização se essa configuração estiver ausente ou fraca. Use um segredo aleatório guardado no gerenciador de segredos do ambiente, nunca versionado no Git. As rotas /api/health e /api/public-config são públicas intencionais; todas as demais rotas /api/ exigem Authorization: Bearer <token> quando o token está configurado.

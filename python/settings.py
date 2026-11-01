@@ -40,10 +40,18 @@ class Settings:
     celestrak_starlink_url: str
     alert_webhook_url: str | None
     api_token: str | None
+    environment: str
 
     @classmethod
     def from_environment(cls) -> "Settings":
         _load_local_env()
+        environment = os.getenv("SENTINEL_ENV", "development").strip().lower()
+        api_token = _optional_env("SENTINEL_API_TOKEN")
+        if environment == "production" and (not api_token or len(api_token) < 32):
+            raise ValueError(
+                "SENTINEL_API_TOKEN must contain at least 32 characters when SENTINEL_ENV=production"
+            )
+
         return cls(
             google_maps_api_key=_optional_env("GOOGLE_MAPS_API_KEY"),
             copernicus_client_id=_optional_env("COPERNICUS_CLIENT_ID"),
@@ -56,7 +64,8 @@ class Settings:
             celestrak_gp_url=os.getenv("CELESTRAK_GP_URL", "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=json"),
             celestrak_starlink_url=os.getenv("CELESTRAK_STARLINK_URL", "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=json"),
             alert_webhook_url=_optional_env("SENTINEL_ALERT_WEBHOOK_URL"),
-            api_token=_optional_env("SENTINEL_API_TOKEN"),
+            api_token=api_token,
+            environment=environment,
         )
 
     def enabled_sources(self) -> list[str]:

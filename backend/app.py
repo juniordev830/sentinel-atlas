@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hmac
 import os
 import sys
 import time
@@ -65,9 +66,22 @@ for saved_fence in store.list():
 
 @app.middleware("http")
 async def optional_token_auth(request: Request, call_next):
-    if settings.api_token and request.url.path.startswith("/api/") and request.url.path not in {"/api/health", "/api/public-config"}:
-        if request.headers.get("authorization") != f"Bearer {settings.api_token}":
-            return JSONResponse(status_code=401, content={"detail": "Token de API inválido"})
+    protected_path = (
+        request.url.path.startswith("/api/")
+        and request.url.path not in {"/api/health", "/api/public-config"}
+    )
+    if protected_path:
+        if not settings.api_token:
+            if settings.environment == "production":
+                return JSONResponse(
+                    status_code=503,
+                    content={"detail": "Autenticação da API não configurada"},
+                )
+        else:
+            authorization = request.headers.get("authorization", "")
+            expected = f"Bearer {settings.api_token}"
+            if not hmac.compare_digest(authorization, expected):
+                return JSONResponse(status_code=401, content={"detail": "Token de API inválido"})
     return await call_next(request)
 
 

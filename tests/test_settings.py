@@ -24,3 +24,22 @@ class SettingsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_production_requires_long_api_token(self):
+        with patch.dict(os.environ, {
+            "SENTINEL_ENV": "production",
+            "SENTINEL_API_TOKEN": "",
+        }, clear=False):
+            with self.assertRaisesRegex(ValueError, "at least 32 characters"):
+                Settings.from_environment()
+
+    def test_production_accepts_long_api_token(self):
+        token = "test-token-" + ("x" * 32)
+        with patch.dict(os.environ, {
+            "SENTINEL_ENV": "production",
+            "SENTINEL_API_TOKEN": token,
+        }, clear=False):
+            settings = Settings.from_environment()
+        self.assertEqual(settings.environment, "production")
+        self.assertEqual(settings.api_token, token)

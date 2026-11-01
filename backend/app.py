@@ -290,9 +290,16 @@ def ai_query(payload: AIQueryInput) -> dict[str, Any]:
 
 @app.websocket("/ws/positions")
 async def positions(websocket: WebSocket) -> None:
-    if settings.api_token and websocket.headers.get("authorization") != f"Bearer {settings.api_token}":
+    if settings.environment == "production" and not settings.api_token:
+        await websocket.close(code=1013, reason="Autenticação da API não configurada")
+        return
+
+    authorization = websocket.headers.get("authorization", "")
+    expected = f"Bearer {settings.api_token}"
+    if settings.api_token and not hmac.compare_digest(authorization, expected):
         await websocket.close(code=1008, reason="Token de API inválido")
         return
+
     await websocket.accept()
     try:
         while True:

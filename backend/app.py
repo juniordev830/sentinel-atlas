@@ -9,7 +9,7 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Query
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -167,9 +167,9 @@ def position_history(limit: int = 100) -> list[dict[str, float]]:
 
 @app.get("/api/map/features")
 def map_features(
-    lat: float = Field(ge=-90, le=90),
-    lng: float = Field(ge=-180, le=180),
-    radius: int = Field(default=500, ge=100, le=1500),
+    lat: float = Query(ge=-90, le=90),
+    lng: float = Query(ge=-180, le=180),
+    radius: int = Query(default=500, ge=100, le=1500),
 ) -> dict[str, Any]:
     """Busca elementos cartográficos públicos do OpenStreetMap próximos a um ponto."""
     import httpx

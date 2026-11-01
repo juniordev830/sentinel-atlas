@@ -299,6 +299,148 @@
         .inspector { position: static; width: 100%; margin-top: 8px; }
         .legend { justify-content: center; flex-wrap: wrap; }
       }
+
+      /* Sentinel Atlas UI refresh — command-center layout */
+      :root {
+        --bg: #030712;
+        --panel: rgba(7, 15, 29, 0.84);
+        --panel-border: rgba(56, 189, 248, 0.22);
+        --panel-border-hover: rgba(34, 211, 238, 0.7);
+        --cyan: #22d3ee;
+        --green: #34d399;
+        --muted: #9aaec4;
+      }
+      body {
+        background:
+          radial-gradient(ellipse at 50% 45%, rgba(8, 47, 73, .22), transparent 45%),
+          linear-gradient(135deg, #020617 0%, #07111f 48%, #030712 100%);
+        letter-spacing: .01em;
+      }
+      .hud { padding: 18px; }
+      .brand, .panel {
+        border-radius: 14px;
+        border-color: rgba(56, 189, 248, .22);
+        background: linear-gradient(145deg, rgba(8, 20, 38, .9), rgba(4, 10, 22, .82));
+        box-shadow: 0 16px 44px rgba(0,0,0,.36), inset 0 1px 0 rgba(226,232,240,.045);
+        backdrop-filter: blur(18px) saturate(125%);
+      }
+      .brand { min-height: 58px; border-left: 2px solid var(--cyan); }
+      .brand strong { letter-spacing: .18em; font-size: 12px; }
+      .brand span { letter-spacing: .04em; }
+      .brand-icon { background: var(--green); box-shadow: 0 0 10px var(--green), 0 0 22px rgba(52,211,153,.5); }
+      .tools { gap: 8px; }
+      #api-status { white-space: nowrap; }
+      input {
+        border-radius: 10px;
+        border-color: rgba(148, 163, 184, .22);
+        background: rgba(2, 6, 23, .72);
+        min-height: 38px;
+      }
+      button {
+        border-radius: 9px;
+        min-height: 34px;
+        border-color: rgba(148, 163, 184, .22);
+        background: rgba(8, 18, 34, .8);
+      }
+      button:hover { transform: translateY(-1px); }
+      button.active { background: linear-gradient(135deg, #22d3ee, #38bdf8); }
+      .filters { max-width: min(100%, 1040px); gap: 7px; }
+      .legend { gap: 12px; }
+      .compass-hud { border-left: 2px solid var(--cyan); }
+      .compass-ring { border-style: solid; border-color: rgba(34,211,238,.75); }
+      .inspector, .ai-panel { border-top: 2px solid var(--cyan); }
+      .ai-chat-box { background: rgba(2, 6, 23, .65); }
+      .overview-panel {
+        position: fixed;
+        left: 18px;
+        top: 148px;
+        width: 238px;
+        z-index: 5;
+        pointer-events: auto;
+        padding: 14px;
+        border-top: 2px solid var(--green);
+      }
+      .overview-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 12px;
+        color: #e2e8f0;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+      }
+      .overview-live {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--green);
+        font: 9px 'JetBrains Mono', monospace;
+        letter-spacing: .04em;
+      }
+      .overview-live::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green);
+      }
+      .overview-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .overview-stat {
+        padding: 10px;
+        min-height: 62px;
+        border: 1px solid rgba(148,163,184,.14);
+        border-radius: 9px;
+        background: rgba(2,6,23,.48);
+      }
+      .overview-stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+      }
+      .overview-stat strong {
+        display: block;
+        margin-top: 7px;
+        color: #f8fafc;
+        font: 600 20px 'JetBrains Mono', monospace;
+      }
+      .overview-stat strong.green { color: var(--green); }
+      .overview-divider { height: 1px; background: rgba(148,163,184,.15); margin: 12px 0; }
+      .overview-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 8px 0;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .overview-row b { color: #dbeafe; font: 500 10px 'JetBrains Mono', monospace; }
+      .overview-foot {
+        margin-top: 12px;
+        color: #64748b;
+        font: 9px 'JetBrains Mono', monospace;
+        line-height: 1.6;
+      }
+      @media (max-width: 900px) {
+        .overview-panel { display: none; }
+        .hud { padding: 10px; }
+        .tools { flex-wrap: wrap; justify-content: flex-end; }
+        #asset-search { width: min(220px, 48vw); }
+        #api-status { font-size: 9px; padding: 8px 10px; }
+        .filters { justify-content: center; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+      }
     </style>
   </head>
   <body>
@@ -325,6 +467,24 @@
           <div id="hud-coords" style="font-size:10px;color:#94a3b8;">LAT --° LNG --°</div>
         </div>
       </div>
+
+      <aside class="panel overview-panel" aria-label="Resumo operacional">
+        <div class="overview-heading">
+          <span>Resumo operacional</span>
+          <span class="overview-live">DEMO</span>
+        </div>
+        <div class="overview-grid">
+          <div class="overview-stat"><span>Ativos no painel</span><strong id="overview-assets">07</strong></div>
+          <div class="overview-stat"><span>Geofences</span><strong id="overview-geofences" class="green">02</strong></div>
+          <div class="overview-stat"><span>Camadas</span><strong>06</strong></div>
+          <div class="overview-stat"><span>API</span><strong id="overview-api" class="green">SIM</strong></div>
+        </div>
+        <div class="overview-divider"></div>
+        <div class="overview-row"><span>Globo 3D</span><b>ATIVO</b></div>
+        <div class="overview-row"><span>Fontes externas</span><b>OPCIONAIS</b></div>
+        <div class="overview-row"><span>Modo de operação</span><b>SIMULAÇÃO</b></div>
+        <div class="overview-foot">SENTINEL / ATLAS<br>VISUALIZAÇÃO GEOESPACIAL</div>
+      </aside>
 
       <div id="inspector" class="panel inspector" hidden></div>
 
@@ -441,6 +601,13 @@
       let replayTimer;
       let positionSocket;
 
+      function updateOverview() {
+        const assetsEl = document.getElementById('overview-assets');
+        const geofencesEl = document.getElementById('overview-geofences');
+        if (assetsEl) assetsEl.textContent = String(assets.length + loadedGeofences.length).padStart(2, '0');
+        if (geofencesEl) geofencesEl.textContent = String(loadedGeofences.length).padStart(2, '0');
+      }
+
       function updateBadges() {
         const counts = { all: assets.length + loadedGeofences.length, aircraft: 0, ship: 0, satellite: 0, traffic: 0, earthquake: 0, geofence: loadedGeofences.length };
         assets.forEach(a => { if (counts[a.type] !== undefined) counts[a.type]++; });
@@ -448,6 +615,7 @@
           const el = document.getElementById(`cnt-${key}`);
           if (el) el.textContent = counts[key];
         });
+        updateOverview();
       }
 
       function replaceAssets(type, incoming) {

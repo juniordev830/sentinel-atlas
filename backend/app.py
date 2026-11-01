@@ -31,8 +31,8 @@ from backend.location import get_location_info  # noqa: E402
 
 
 class AIAnalyzeInput(BaseModel):
-    assets: list[dict[str, Any]] = Field(default_factory=list)
-    geofences: list[dict[str, Any]] = Field(default_factory=list)
+    assets: list[dict[str, Any]] = Field(default_factory=list, max_length=1000)
+    geofences: list[dict[str, Any]] = Field(default_factory=list, max_length=500)
 
 
 class AIQueryInput(BaseModel):
@@ -303,7 +303,11 @@ async def positions(websocket: WebSocket) -> None:
     await websocket.accept()
     try:
         while True:
-            payload = PositionInput.model_validate_json(await websocket.receive_text())
+            message = await websocket.receive_text()
+            if len(message.encode("utf-8")) > 16_384:
+                await websocket.close(code=1009, reason="Mensagem excede o limite de 16 KiB")
+                return
+            payload = PositionInput.model_validate_json(message)
             position = Position(payload.latitude, payload.longitude, payload.timestamp or time.time())
             store.save_position(position)
             events = []

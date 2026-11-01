@@ -1,0 +1,85 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "commitMessage",
+      "type": "promptString",
+      "description": "Mensagem do commit",
+      "default": "chore: atualizar projeto"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "Git: ver estado",
+      "type": "process",
+      "command": "git",
+      "args": [
+        "status",
+        "--short --branch"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Git: atualizar do GitHub (pull --rebase)",
+      "type": "process",
+      "command": "git",
+      "args": [
+        "pull",
+        "--rebase"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Git: adicionar alterações",
+      "type": "process",
+      "command": "git",
+      "args": [
+        "add",
+        "-A"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Git: criar commit",
+      "type": "process",
+      "command": "git",
+      "args": [
+        "commit",
+        "-m",
+        "${input:commitMessage}"
+      ],
+      "dependsOn": "Git: adicionar alterações",
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Git: enviar para GitHub (push)",
+      "type": "process",
+      "command": "git",
+      "args": [
+        "push"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Git: salvar e enviar",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Git: adicionar alterações",
+        "Git: criar commit",
+        "Git: enviar para GitHub (push)"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Python: executar testes",
+      "type": "process",
+      "command": "python",
+      "args": [
+        "-m",
+        "pytest"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

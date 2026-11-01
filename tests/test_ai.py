@@ -62,3 +62,18 @@ def test_ai_api_endpoints():
     data_query = res_query.json()
     assert "answer" in data_query
     assert "copilot" in data_query
+
+
+def test_zero_coordinates_are_not_treated_as_missing():
+    analyzer = GeoINTAnalyzer()
+    report = analyzer.analyze_situation(
+        assets=[{"name": "Equator asset", "latitude": 0.0, "lat": 20.0, "longitude": 0.0, "lon": 20.0}],
+        geofences=[{"name": "Origin", "latitude": 0.0, "longitude": 0.0, "radius_meters": 1000}],
+    )
+    assert report["risks"]
+    assert report["risks"][0]["status"] == "VIOLAÇÃO DE PERÍMETRO"
+
+
+def test_haversine_distance_handles_antipodal_points():
+    distance = GeoINTAnalyzer._calculate_distance_km(0.0, 0.0, 0.0, 180.0)
+    assert 20000 < distance < 20100

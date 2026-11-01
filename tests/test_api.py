@@ -55,3 +55,43 @@ def test_websocket_rejects_production_when_token_is_missing(monkeypatch):
             pass
 
     assert error.value.code == 1013
+
+
+def test_health_is_public():
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+def test_websocket_rejects_invalid_token(monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "settings",
+        replace(app_module.settings, environment="production", api_token="x" * 32),
+    )
+
+    with pytest.raises(WebSocketDisconnect) as error:
+        with client.websocket_connect(
+            "/ws/positions",
+            headers={"Authorization": "Bearer invalid-token"},
+        ):
+            pass
+
+    assert error.value.code == 1008
+
+
+def test_websocket_rejects_oversized_message(monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "settings",
+        replace(app_module.settings, environment="production", api_token="x" * 32),
+    )
+
+    with client.websocket_connect(
+        "/ws/positions",
+        headers={"Authorization": "Bearer " + "x" * 32},
+    ) as websocket:
+        websocket.send_text("x" * 16_385)
+        with pytest.raises(WebSocketDisconnect) as error:
+            websocket.receive_text()
+        assert error.value.code == 1009

@@ -1,5 +1,10 @@
-from fastapi.testclient import TestClient
+from dataclasses import replace
 
+import pytest
+from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
+
+import backend.app as app_module
 from backend.app import app
 
 client = TestClient(app)
@@ -35,3 +40,18 @@ def test_create_list_and_delete_geofence():
     # Delete again -> 404
     resp = client.delete("/api/geofences/test_zone")
     assert resp.status_code == 404
+
+
+
+def test_websocket_rejects_production_when_token_is_missing(monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "settings",
+        replace(app_module.settings, environment="production", api_token=None),
+    )
+
+    with pytest.raises(WebSocketDisconnect) as error:
+        with client.websocket_connect("/ws/positions"):
+            pass
+
+    assert error.value.code == 1013

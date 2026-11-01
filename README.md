@@ -117,6 +117,7 @@ python python/gps_core.py --nmea '$GPRMC,123519,A,2331.000,S,04637.998,W,0.0,0.0
 | GET | `/api/sources` | Consultar fontes configuradas |
 | GET / POST | `/api/geofences` | Consultar e cadastrar geofences |
 | WebSocket | `/ws/positions` | Canal de posições em tempo real |
+| GET | `/api/map/features?lat=-5.8&lng=-35.2&radius=500` | Consultar edifícios, vias, transporte e locais mapeados pelo OpenStreetMap em um raio de até 1,5 km |
 
 Os endpoints disponíveis podem evoluir durante o desenvolvimento. Consulte `backend/app.py` para o contrato atual.
 
@@ -126,7 +127,7 @@ Os endpoints disponíveis podem evoluir durante o desenvolvimento. Consulte `bac
 2. Preencha apenas as credenciais dos provedores que deseja habilitar.
 3. Mantenha segredos e tokens no ambiente local; nunca os envie ao Git.
 
-O projeto prevê integrações opcionais com fontes como NASA GIBS, USGS Earthquakes, CelesTrak/SGP4, OSRM/OpenStreetMap e provedores que exigem credenciais, como Google Maps, Copernicus, AISStream e OpenSky. A disponibilidade depende da configuração local, de limites dos serviços e das dependências instaladas.
+O projeto prevê integrações opcionais com fontes como NASA GIBS, USGS Earthquakes, CelesTrak/SGP4, OpenStreetMap/Overpass (edifícios, vias, transporte e locais mapeados) e provedores que exigem credenciais, como Google Maps, Copernicus, AISStream e OpenSky. A disponibilidade depende da configuração local, de limites dos serviços e das dependências instaladas.
 
 ## Testes
 

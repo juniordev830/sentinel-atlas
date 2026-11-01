@@ -438,6 +438,17 @@
         #api-status { font-size: 9px; padding: 8px 10px; }
         .filters { justify-content: center; }
       }
+      .search-wrap { display: flex; align-items: center; gap: 7px; }
+      #search-feedback { min-width: 54px; color: #7dd3fc; font: 10px 'JetBrains Mono', monospace; text-align: right; white-space: nowrap; }
+      .ai-msg { overflow-wrap: anywhere; }
+      .ai-msg.user { border-right: 2px solid var(--cyan); padding-right: 8px; }
+      .ai-msg.bot { border-left: 2px solid var(--green); padding-left: 8px; }
+      button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+      .overview-panel { max-height: calc(100vh - 190px); overflow-y: auto; }
+      @media (max-width: 900px) {
+        .search-wrap { width: 100%; }
+        #search-feedback { display: none; }
+      }
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
       }
@@ -455,7 +466,10 @@
           </div>
         </div>
         <div class="tools">
-          <input id="asset-search" type="search" placeholder="🔍 Buscar ativo ou cidade..." aria-label="Buscar ativo ou cidade" />
+          <div class="search-wrap">
+            <input id="asset-search" type="search" placeholder="⌕ Buscar ativo ou cidade... (/)" aria-label="Buscar ativo ou cidade" aria-keyshortcuts="/" />
+            <span id="search-feedback" aria-live="polite">TODOS</span>
+          </div>
           <div id="api-status" class="panel status">DEMONSTRAÇÃO · dados simulados</div>
         </div>
       </div>
@@ -765,7 +779,13 @@
         document.querySelectorAll('[data-layer]').forEach(item => item.classList.remove('active'));
         button.classList.add('active');
         const layer = button.dataset.layer;
-        globe.pointsData(getFilteredPoints(layer));
+        if (typeof assetSearchInput !== 'undefined' && assetSearchInput.value.trim()) {
+          applyAssetSearch();
+        } else {
+          globe.pointsData(getFilteredPoints(layer));
+          const feedback = document.getElementById('search-feedback');
+          if (feedback) feedback.textContent = layer === 'all' ? 'TODOS' : layer.toUpperCase();
+        }
       }));
 
       async function fetchBackendGeofences() {
@@ -879,11 +899,52 @@
       }
       document.getElementById('my-location').addEventListener('click', startDeviceLocation);
 
-      document.getElementById('asset-search').addEventListener('input', event => {
-        const query = event.target.value.trim().toLowerCase();
-        const matches = query ? assets.filter(asset => asset.label.toLowerCase().includes(query) || asset.type.includes(query)) : assets;
+      const assetSearchInput = document.getElementById('asset-search');
+      const searchFeedback = document.getElementById('search-feedback');
+
+      function applyAssetSearch() {
+        const query = assetSearchInput.value.trim().toLocaleLowerCase('pt-BR');
+        const activeLayer = document.querySelector('[data-layer].active')?.dataset.layer || 'all';
+        if (!query) {
+          globe.pointsData(getFilteredPoints(activeLayer));
+          searchFeedback.textContent = activeLayer === 'all' ? 'TODOS' : activeLayer.toUpperCase();
+          return;
+        }
+
+        const matchingAssets = assets.filter(asset =>
+          asset.label.toLocaleLowerCase('pt-BR').includes(query) ||
+          asset.type.toLocaleLowerCase('pt-BR').includes(query) ||
+          asset.id.toLocaleLowerCase('pt-BR').includes(query)
+        );
+        const matchingFences = loadedGeofences
+          .filter(fence => fence.name.toLocaleLowerCase('pt-BR').includes(query))
+          .map(fence => ({
+            id: `gf-${fence.name}`, type: 'geofence',
+            lat: fence.latitude, lng: fence.longitude,
+            color: '#4ade80', altitude: 0.02,
+            label: `Geofence: ${fence.name} · ${fence.radius_meters}m`
+          }));
+        const matches = [...matchingAssets, ...matchingFences];
         globe.pointsData(matches);
-        if (matches.length === 1) globe.pointOfView({ lat: matches[0].lat, lng: matches[0].lng, altitude: 1.8 }, 700);
+        searchFeedback.textContent = matches.length ? `${matches.length} RESULTADO(S)` : 'SEM RESULTADOS';
+        if (matches.length === 1) {
+          globe.pointOfView({ lat: matches[0].lat, lng: matches[0].lng, altitude: 1.8 }, 700);
+        }
+      }
+
+      assetSearchInput.addEventListener('input', applyAssetSearch);
+      document.addEventListener('keydown', event => {
+        const target = event.target;
+        const typing = target instanceof HTMLElement &&
+          (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+        if (event.key === '/' && !typing) {
+          event.preventDefault();
+          assetSearchInput.focus();
+        } else if (event.key === 'Escape' && document.activeElement === assetSearchInput) {
+          assetSearchInput.value = '';
+          applyAssetSearch();
+          assetSearchInput.blur();
+        }
       });
 
       // Interatividade do Copiloto IA
@@ -928,7 +989,12 @@
         const question = input.value.trim();
         if (!question) return;
 
-        chatBox.innerHTML += `<div class="ai-msg user"><b>Você:</b> ${question}</div>`;
+        const userMessage = document.createElement('div');
+        userMessage.className = 'ai-msg user';
+        const userLabel = document.createElement('b');
+        userLabel.textContent = 'Você: ';
+        userMessage.append(userLabel, document.createTextNode(question));
+        chatBox.appendChild(userMessage);
         input.value = '';
         chatBox.scrollTop = chatBox.scrollHeight;
 
@@ -940,9 +1006,18 @@
           });
           if (!res.ok) throw new Error('Falha na resposta');
           const data = await res.json();
-          chatBox.innerHTML += `<div class="ai-msg bot"><b>🤖 Copiloto:</b> ${data.answer.replace(/\n/g, '<br>')}</div>`;
+          const botMessage = document.createElement('div');
+          botMessage.className = 'ai-msg bot';
+          const botLabel = document.createElement('b');
+          botLabel.textContent = '🤖 Copiloto: ';
+          botMessage.append(botLabel, document.createTextNode(String(data.answer ?? 'A API não retornou uma resposta.')));
+          chatBox.appendChild(botMessage);
         } catch (err) {
-          chatBox.innerHTML += `<div class="ai-msg bot" style="color:var(--red);"><b>🤖 Copiloto:</b> Desculpe, ocorreu um erro ao processar sua pergunta.</div>`;
+          const errorMessage = document.createElement('div');
+          errorMessage.className = 'ai-msg bot';
+          errorMessage.style.color = 'var(--red)';
+          errorMessage.textContent = '🤖 Copiloto: Desculpe, ocorreu um erro ao processar sua pergunta.';
+          chatBox.appendChild(errorMessage);
         }
         chatBox.scrollTop = chatBox.scrollHeight;
       }

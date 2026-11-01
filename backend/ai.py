@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import os
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -29,6 +30,8 @@ class GeoINTAnalyzer:
             * math.cos(math.radians(lat2))
             * math.sin(dlon / 2) ** 2
         )
+        # Floating-point rounding can make a slightly exceed 1 for near-antipodal points.
+        a = min(1.0, max(0.0, a))
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return R * c
 
@@ -42,8 +45,12 @@ class GeoINTAnalyzer:
 
         # Análise de densidade e proximidade com geofences
         for asset in assets:
-            asset_lat = asset.get("latitude") or asset.get("lat") or 0.0
-            asset_lon = asset.get("longitude") or asset.get("lon") or 0.0
+            asset_lat = asset.get("latitude")
+            if asset_lat is None:
+                asset_lat = asset.get("lat", 0.0)
+            asset_lon = asset.get("longitude")
+            if asset_lon is None:
+                asset_lon = asset.get("lon", 0.0)
             asset_name = asset.get("name") or asset.get("callsign") or asset.get("id") or "Ativo Desconhecido"
             asset_type = asset.get("type", "desconhecido").lower()
 
@@ -105,7 +112,7 @@ class GeoINTAnalyzer:
             "summary": summary,
             "risks": risks,
             "anomalies": anomalies,
-            "timestamp_utc": os.popen("date -u '+%Y-%m-%d %H:%M:%S UTC'").read().strip() or "2026-10-21 UTC",
+            "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         }
 
     def query_copilot(self, question: str, context: dict[str, Any] | None = None) -> dict[str, Any]:

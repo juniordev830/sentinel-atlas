@@ -42,6 +42,44 @@ def test_create_list_and_delete_geofence():
     assert resp.status_code == 404
 
 
+def test_http_api_requires_configured_bearer_token(monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "settings",
+        replace(app_module.settings, environment="test", api_token="test-token"),
+    )
+
+    assert client.get("/api/geofences").status_code == 401
+    assert client.get(
+        "/api/geofences", headers={"Authorization": "Bearer wrong-token"}
+    ).status_code == 401
+    assert client.get(
+        "/api/geofences", headers={"Authorization": "Bearer test-token"}
+    ).status_code == 200
+
+
+def test_public_health_remains_available_without_token(monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "settings",
+        replace(app_module.settings, environment="production", api_token="test-token"),
+    )
+
+    response = client.get("/api/health")
+    assert response.status_code == 200
+
+
+def test_http_api_fails_closed_in_production_without_token(monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "settings",
+        replace(app_module.settings, environment="production", api_token=None),
+    )
+
+    response = client.get("/api/geofences")
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Autenticação da API não configurada"}
+
 
 def test_websocket_rejects_production_when_token_is_missing(monkeypatch):
     monkeypatch.setattr(

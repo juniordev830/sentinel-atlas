@@ -165,6 +165,93 @@ def position_history(limit: int = 100) -> list[dict[str, float]]:
     return [asdict(position) for position in store.list_positions(limit)]
 
 
+@app.get("/api/map/features")
+def map_features(
+    lat: float = Field(ge=-90, le=90),
+    lng: float = Field(ge=-180, le=180),
+    radius: int = Field(default=500, ge=100, le=1500),
+) -> dict[str, Any]:
+    """Busca elementos cartográficos públicos do OpenStreetMap próximos a um ponto."""
+    import httpx
+
+    query = f"""
+    [out:json][timeout:12];
+    (
+      nwr(around:{radius},{lat},{lng})["building"];
+      nwr(around:{radius},{lat},{lng})["highway"];
+      nwr(around:{radius},{lat},{lng})["public_transport"];
+      nwr(around:{radius},{lat},{lng})["railway"];
+      nwr(around:{radius},{lat},{lng})["amenity"];
+      nwr(around:{radius},{lat},{lng})["shop"];
+      nwr(around:{radius},{lat},{lng})["office"];
+      nwr(around:{radius},{lat},{lng})["leisure"];
+      nwr(around:{radius},{lat},{lng})["tourism"];
+    );
+    out center tags 100;
+    """
+    try:
+        response = httpx.post(
+            "https://overpass-api.de/api/interpreter",
+            data={"data": query},
+            timeout=15.0,
+            headers={"User-Agent": "SentinelAtlas/0.1 (public map features)"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPError, ValueError) as error:
+        raise HTTPException(
+            status_code=503,
+            detail="Dados cartográficos temporariamente indisponíveis; tente novamente mais tarde.",
+        ) from error
+
+    items: list[dict[str, Any]] = []
+    for element in payload.get("elements", []):
+        tags = element.get("tags") or {}
+        center = element.get("center") or {}
+        item_lat = element.get("lat", center.get("lat"))
+        item_lng = element.get("lon", center.get("lon"))
+        if item_lat is None or item_lng is None:
+            continue
+        if "building" in tags:
+            kind = "building"
+            name = tags.get("name") or tags.get("building", "Edificação sem nome")
+        elif "highway" in tags:
+            kind = "road"
+            name = tags.get("name") or tags.get("highway", "Via sem nome")
+        elif "public_transport" in tags or "railway" in tags:
+            kind = "transport"
+            name = tags.get("name") or tags.get("public_transport") or tags.get("railway", "Ponto de transporte")
+        else:
+            kind = "place"
+            name = tags.get("name") or next(
+                (tags[key] for key in ("amenity", "shop", "office", "leisure", "tourism") if key in tags),
+                "Local mapeado",
+            )
+        items.append({
+            "id": f"osm-{element.get('type', 'item')}-{element.get('id', '')}",
+            "kind": kind,
+            "name": str(name)[:160],
+            "lat": float(item_lat),
+            "lng": float(item_lng),
+            "category": str(tags.get("building") or tags.get("highway") or tags.get("amenity") or tags.get("public_transport") or tags.get("railway") or tags.get("shop") or tags.get("tourism") or tags.get("leisure") or tags.get("office") or "mapa")[:80],
+            "source": "OpenStreetMap",
+        })
+    return {
+        "source": "OpenStreetMap / Overpass API",
+        "updated_at": time.time(),
+        "center": {"lat": lat, "lng": lng},
+        "radius_meters": radius,
+        "count": len(items),
+        "counts": {
+            "buildings": sum(item["kind"] == "building" for item in items),
+            "roads": sum(item["kind"] == "road" for item in items),
+            "transport": sum(item["kind"] == "transport" for item in items),
+            "places": sum(item["kind"] == "place" for item in items),
+        },
+        "items": items,
+    }
+
+
 @app.get("/api/location/info")
 def location_info(lat: float, lng: float) -> dict[str, Any]:
     if not (-90 <= lat <= 90 and -180 <= lng <= 180):

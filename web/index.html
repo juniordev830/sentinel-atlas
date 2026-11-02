@@ -452,6 +452,129 @@
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
       }
+
+      /* Painel de operação: hierarquia mais clara sem cobrir o globo. */
+      #globe, #map { z-index: 0; }
+      #globe::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 38%, rgba(2, 6, 23, .48) 100%);
+      }
+      .hud { z-index: 10; }
+      .brand, .panel {
+        border-color: rgba(103, 232, 249, .24);
+        background: linear-gradient(145deg, rgba(10, 25, 43, .94), rgba(3, 10, 21, .88));
+        box-shadow: 0 18px 48px rgba(0, 0, 0, .42), inset 0 1px 0 rgba(255, 255, 255, .06);
+      }
+      .brand { border-left: 3px solid var(--cyan); }
+      .brand strong { color: #f0fdff; }
+      .brand span, .overview-row, .overview-stat span { color: #b5c9d8; }
+      .status { color: #b9eaf3; }
+      .status::before { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+      .overview-panel > summary { cursor: pointer; list-style: none; }
+      .overview-panel > summary::-webkit-details-marker { display: none; }
+      .overview-panel > summary::after { content: '▾'; color: var(--cyan); font-size: 13px; }
+      .overview-panel:not([open]) > summary { margin-bottom: 0; }
+      .overview-title-short { display: none; }
+      .overview-stat span { font-size: 10px; line-height: 1.4; }
+      .overview-stat { border-color: rgba(103, 232, 249, .16); }
+      .overview-foot { color: #a4b9ca; }
+      .control-deck {
+        flex: 1;
+        min-width: 0;
+        max-width: 1080px;
+        padding: 11px 13px;
+        display: grid;
+        gap: 8px;
+      }
+      .control-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+      .control-label {
+        flex: 0 0 75px;
+        color: #a7c2d2;
+        font: 600 10px 'JetBrains Mono', monospace;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+      }
+      .filters, .tool-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; min-width: 0; }
+      .bottombar { align-items: flex-end; }
+      .legend { max-width: 360px; flex-wrap: wrap; justify-content: flex-end; }
+      button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+      @media (max-width: 900px) {
+        .hud {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          grid-template-rows: auto auto minmax(0, 1fr) auto;
+          gap: 8px;
+          justify-content: normal;
+        }
+        .topbar { grid-row: 1; grid-column: 1 / -1; }
+        .compass-hud {
+          position: static;
+          grid-row: 2;
+          grid-column: 1;
+          justify-self: start;
+          align-self: start;
+          margin: 0;
+        }
+        .overview-panel {
+          display: block;
+          position: static;
+          grid-row: 2;
+          grid-column: 2;
+          justify-self: end;
+          align-self: start;
+          width: auto;
+          max-height: max(100px, calc(100dvh - 300px));
+          margin: 0;
+          z-index: 12;
+        }
+        .overview-panel[open] { grid-column: 1 / -1; width: min(238px, 100%); }
+        .bottombar { grid-row: 4; grid-column: 1 / -1; min-width: 0; }
+        .control-deck { width: 100%; }
+        .control-row { display: grid; gap: 5px; }
+        .filters, .tool-actions {
+          justify-content: flex-start;
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          max-width: 100%;
+          padding: 2px 2px 5px;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(103, 232, 249, .55) transparent;
+        }
+        .filters button, .tool-actions button { flex: 0 0 auto; min-height: 44px; }
+        .legend { display: none; }
+        .inspector, .ai-panel {
+          position: fixed;
+          right: 10px;
+          top: 110px;
+          width: min(360px, calc(100vw - 20px));
+          max-height: max(110px, calc(100dvh - 260px));
+          overflow-y: auto;
+          margin: 0;
+          z-index: 30;
+        }
+      }
+      @media (max-width: 768px) {
+        .hud { padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+        .topbar { flex-direction: column; gap: 6px; }
+        .brand { min-height: 42px; padding: 8px 12px; }
+        .brand span { display: none; }
+        .tools { display: flex; flex-wrap: nowrap; align-items: stretch; width: 100%; }
+        .search-wrap { flex: 1; width: auto; min-width: 0; }
+        #asset-search { width: 100%; min-width: 0; min-height: 44px; }
+        #api-status { max-width: 45%; max-height: 60px; overflow: auto; white-space: normal; line-height: 1.3; }
+      }
+      @media (max-width: 520px) {
+        .overview-title-full { display: none; }
+        .overview-title-short { display: inline; }
+      }
+      @media (max-height: 500px) and (max-width: 900px) {
+        .compass-hud, .overview-panel { display: none; }
+        .hud { grid-template-rows: auto minmax(0, 1fr) auto; }
+        .bottombar { grid-row: 3; }
+      }
     </style>
   </head>
   <body>
@@ -470,7 +593,7 @@
             <input id="asset-search" type="search" placeholder="⌕ Buscar ativo ou cidade... (/)" aria-label="Buscar ativo ou cidade" aria-keyshortcuts="/" />
             <span id="search-feedback" aria-live="polite">TODOS</span>
           </div>
-          <div id="api-status" class="panel status">DEMONSTRAÇÃO · dados simulados</div>
+          <div id="api-status" class="panel status" role="status" aria-live="polite">DEMONSTRAÇÃO · dados simulados</div>
         </div>
       </div>
 
@@ -482,23 +605,24 @@
         </div>
       </div>
 
-      <aside class="panel overview-panel" aria-label="Resumo operacional">
-        <div class="overview-heading">
-          <span>Resumo operacional</span>
+      <details id="overview-panel" class="panel overview-panel" aria-label="Resumo operacional" open>
+        <summary class="overview-heading">
+          <span class="overview-title-full">Resumo operacional</span>
+          <span class="overview-title-short">Resumo</span>
           <span class="overview-live">DEMO</span>
-        </div>
+        </summary>
         <div class="overview-grid">
-          <div class="overview-stat"><span>Ativos no painel</span><strong id="overview-assets">07</strong></div>
-          <div class="overview-stat"><span>Geofences</span><strong id="overview-geofences" class="green">02</strong></div>
+          <div class="overview-stat"><span>Itens no painel</span><strong id="overview-assets">--</strong></div>
+          <div class="overview-stat"><span>Geofences</span><strong id="overview-geofences" class="green">--</strong></div>
           <div class="overview-stat"><span>Camadas</span><strong>06</strong></div>
-          <div class="overview-stat"><span>API</span><strong id="overview-api" class="green">SIM</strong></div>
+          <div class="overview-stat"><span>API</span><strong id="overview-api" aria-live="polite">--</strong></div>
         </div>
         <div class="overview-divider"></div>
         <div class="overview-row"><span>Globo 3D</span><b>ATIVO</b></div>
         <div class="overview-row"><span>Fontes externas</span><b>OPCIONAIS</b></div>
-        <div class="overview-row"><span>Modo de operação</span><b>SIMULAÇÃO</b></div>
-        <div class="overview-foot">SENTINEL / ATLAS<br>VISUALIZAÇÃO GEOESPACIAL</div>
-      </aside>
+        <div class="overview-row"><span>Dados</span><b>DEMO + FONTES</b></div>
+        <div class="overview-foot">Algumas camadas são simuladas; fontes externas dependem de configuração.</div>
+      </details>
 
       <div id="inspector" class="panel inspector" hidden></div>
 
@@ -524,19 +648,29 @@
       </div>
 
       <div class="bottombar">
-        <div class="panel filters" aria-label="Filtros de camadas">
-          <button class="active" data-layer="all">Tudo <span id="cnt-all" class="badge">0</span></button>
-          <button data-layer="aircraft">Aviões <span id="cnt-aircraft" class="badge">0</span></button>
-          <button data-layer="ship">Navios <span id="cnt-ship" class="badge">0</span></button>
-          <button data-layer="satellite">Satélites <span id="cnt-satellite" class="badge">0</span></button>
-          <button data-layer="traffic">Trânsito <span id="cnt-traffic" class="badge">0</span></button>
-          <button data-layer="earthquake">Terremotos <span id="cnt-earthquake" class="badge">0</span></button>
-          <button data-layer="geofence">Geofences <span id="cnt-geofence" class="badge">0</span></button>
+        <div class="panel control-deck">
+          <div class="control-row">
+            <span class="control-label">Camadas</span>
+            <div class="filters" role="group" aria-label="Filtros de camadas">
+          <button class="active" data-layer="all" aria-pressed="true">Tudo <span id="cnt-all" class="badge">0</span></button>
+          <button data-layer="aircraft" aria-pressed="false">Aviões <span id="cnt-aircraft" class="badge">0</span></button>
+          <button data-layer="ship" aria-pressed="false">Navios <span id="cnt-ship" class="badge">0</span></button>
+          <button data-layer="satellite" aria-pressed="false">Satélites <span id="cnt-satellite" class="badge">0</span></button>
+          <button data-layer="traffic" aria-pressed="false">Trânsito <span id="cnt-traffic" class="badge">0</span></button>
+          <button data-layer="earthquake" aria-pressed="false">Terremotos <span id="cnt-earthquake" class="badge">0</span></button>
+          <button data-layer="geofence" aria-pressed="false">Geofences <span id="cnt-geofence" class="badge">0</span></button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="control-label">Ferramentas</span>
+            <div class="tool-actions" role="group" aria-label="Ferramentas do mapa">
           <button id="my-location">📍 Minha localização</button>
           <button id="replay-history">⏱️ Histórico</button>
           <button id="texture-toggle">☀️ Luz do dia</button>
-          <button id="map-view">🛰️ Mapa satélite</button>
+          <button id="map-view" aria-pressed="false">🛰️ Mapa satélite</button>
           <button id="toggle-ai" style="border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,0.15);">🤖 Copiloto IA</button>
+            </div>
+          </div>
         </div>
         <div class="panel legend">
           <span>Aviões</span>
@@ -550,6 +684,12 @@
     </div>
     <div id="map" aria-label="Mapa Google com imagens de satélite e trânsito"></div>
     <script>
+      // No celular, o resumo começa recolhido para preservar espaço para o mapa.
+      const overviewPanel = document.getElementById('overview-panel');
+      const compactLayout = window.matchMedia('(max-width: 900px)');
+      overviewPanel.open = !compactLayout.matches;
+      compactLayout.addEventListener?.('change', event => { overviewPanel.open = !event.matches; });
+
       const assets = [
         { id:'flight-1', type:'aircraft', label:'JJ 3812 · São Paulo', lat:-23.55, lng:-46.63, color:'#38bdf8', altitude:0.04 },
         { id:'flight-2', type:'aircraft', label:'AD 4520 · Recife', lat:-8.05, lng:-34.9, color:'#38bdf8', altitude:0.04 },
@@ -818,8 +958,12 @@
       setInterval(updateHUD, 500);
 
       document.querySelectorAll('[data-layer]').forEach(button => button.addEventListener('click', () => {
-        document.querySelectorAll('[data-layer]').forEach(item => item.classList.remove('active'));
+        document.querySelectorAll('[data-layer]').forEach(item => {
+          item.classList.remove('active');
+          item.setAttribute('aria-pressed', 'false');
+        });
         button.classList.add('active');
+        button.setAttribute('aria-pressed', 'true');
         const layer = button.dataset.layer;
         if (typeof assetSearchInput !== 'undefined' && assetSearchInput.value.trim()) {
           applyAssetSearch();
@@ -1072,10 +1216,16 @@
         try {
           const response = await fetch('/api/health', { headers: { Accept: 'application/json' } });
           if (!response.ok) throw new Error('API indisponível');
-          const data = await response.json();
-          status.textContent = `API ONLINE · ${new Date(data.timestamp * 1000).toLocaleTimeString()}`;
+          await response.json();
+          if (status.textContent !== 'API ONLINE · DADOS MISTOS') status.textContent = 'API ONLINE · DADOS MISTOS';
+          const overview = document.getElementById('overview-api');
+          if (overview.textContent !== 'ON') overview.textContent = 'ON';
+          overview.classList.add('green');
         } catch {
-          status.textContent = 'DEMONSTRAÇÃO · API não conectada';
+          if (status.textContent !== 'DEMONSTRAÇÃO · API não conectada') status.textContent = 'DEMONSTRAÇÃO · API não conectada';
+          const overview = document.getElementById('overview-api');
+          if (overview.textContent !== 'OFF') overview.textContent = 'OFF';
+          overview.classList.remove('green');
         }
       }
       refreshApiStatus();
@@ -1096,17 +1246,32 @@
               document.head.appendChild(script);
             });
           }
-          googleMap ??= new google.maps.Map(document.getElementById('map'), {
-            center: { lat: -23.5505, lng: -46.6333 }, zoom: 11, mapTypeId: 'satellite',
-          });
-          new google.maps.TrafficLayer().setMap(googleMap);
-          document.body.classList.add('map-mode');
+          if (!googleMap) {
+            googleMap = new google.maps.Map(document.getElementById('map'), {
+              center: { lat: -23.5505, lng: -46.6333 }, zoom: 11, mapTypeId: 'satellite',
+            });
+            new google.maps.TrafficLayer().setMap(googleMap);
+          }
+          setMapView(true);
           status.textContent = 'GOOGLE MAPS · satélite + trânsito';
         } catch (error) {
           status.textContent = `MAPA 2D INDISPONÍVEL · ${error.message}`;
         }
       }
-      document.getElementById('map-view').addEventListener('click', openSatelliteMap);
+      function setMapView(enabled) {
+        document.body.classList.toggle('map-mode', enabled);
+        const button = document.getElementById('map-view');
+        button.textContent = enabled ? '🌐 Voltar ao globo' : '🛰️ Mapa satélite';
+        button.setAttribute('aria-pressed', String(enabled));
+      }
+      document.getElementById('map-view').addEventListener('click', () => {
+        if (document.body.classList.contains('map-mode')) {
+          setMapView(false);
+          document.getElementById('api-status').textContent = 'GLOBO 3D · visualização do painel';
+        } else {
+          openSatelliteMap();
+        }
+      });
     </script>
   </body>
 </html>

@@ -12,7 +12,7 @@ O **Sentinel Atlas** reúne um núcleo de geolocalização em Python, uma API as
 
 - **Geofencing:** cálculo de distância e detecção de entrada/saída de áreas configuradas.
 - **API:** endpoints HTTP com FastAPI e canal WebSocket para posições.
-- **Persistência local:** armazenamento SQLite para geofences.
+- **Persistência local:** armazenamento SQLite para geofences e histórico GPS limitado às 10.000 posições recebidas mais recentemente. Registros antigos excedentes são removidos também ao abrir um banco existente; esse limite não substitui uma política completa de retenção e privacidade.
 - **Painel 3D:** interface web com camadas, filtros e rotas demonstrativas.
 - **Fontes externas:** integrações opcionais com serviços públicos e provedores que exigem credenciais.
 - **Execução reproduzível:** suporte a Docker e verificações automatizadas via GitHub Actions.

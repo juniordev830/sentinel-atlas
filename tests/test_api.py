@@ -145,3 +145,107 @@ def test_position_input_rejects_invalid_timestamps(timestamp):
 def test_position_input_preserves_zero_timestamp():
     position = PositionInput(latitude=0, longitude=0, timestamp=0)
     assert position.timestamp == 0
+
+
+
+def _configure_browser_auth(monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "settings",
+        replace(app_module.settings, environment="test", api_token="test-browser-token"),
+    )
+    client.cookies.clear()
+
+
+def test_browser_login_creates_httponly_session_cookie(monkeypatch):
+    _configure_browser_auth(monkeypatch)
+
+    response = client.post(
+        "/api/session",
+        json={"token": "test-browser-token"},
+        headers={"Origin": "http://testserver"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"authenticated": True, "expires_in": 3600}
+    cookie = response.headers["set-cookie"].lower()
+    assert "sentinel_session=" in cookie
+    assert "httponly" in cookie
+    assert "samesite=strict" in cookie
+    assert client.get("/api/geofences").status_code == 200
+
+
+def test_browser_login_rejects_invalid_token_and_cross_origin(monkeypatch):
+    _configure_browser_auth(monkeypatch)
+
+    invalid_token = client.post(
+        "/api/session",
+        json={"token": "wrong-token"},
+        headers={"Origin": "http://testserver"},
+    )
+    assert invalid_token.status_code == 401
+
+    invalid_origin = client.post(
+        "/api/session",
+        json={"token": "test-browser-token"},
+        headers={"Origin": "https://attacker.example"},
+    )
+    assert invalid_origin.status_code == 403
+
+
+def test_browser_session_blocks_cross_origin_mutations(monkeypatch):
+    _configure_browser_auth(monkeypatch)
+    login = client.post(
+        "/api/session",
+        json={"token": "test-browser-token"},
+        headers={"Origin": "http://testserver"},
+    )
+    assert login.status_code == 200
+
+    response = client.post(
+        "/api/geofences",
+        json={
+            "name": "csrf_attempt",
+            "latitude": -23.55,
+            "longitude": -46.63,
+            "radius_meters": 100,
+        },
+        headers={"Origin": "https://attacker.example"},
+    )
+    assert response.status_code == 403
+
+
+def test_browser_session_authenticates_websocket_with_same_origin(monkeypatch):
+    _configure_browser_auth(monkeypatch)
+    login = client.post(
+        "/api/session",
+        json={"token": "test-browser-token"},
+        headers={"Origin": "http://testserver"},
+    )
+    assert login.status_code == 200
+
+    with client.websocket_connect(
+        "/ws/positions",
+        headers={"Origin": "http://testserver"},
+    ) as websocket:
+        websocket.send_json({"latitude": -23.55, "longitude": -46.63, "timestamp": 1})
+        message = websocket.receive_json()
+        assert message["position"]["timestamp"] == 1
+
+    client.cookies.clear()
+
+
+def test_browser_session_logout_clears_cookie(monkeypatch):
+    _configure_browser_auth(monkeypatch)
+    login = client.post(
+        "/api/session",
+        json={"token": "test-browser-token"},
+        headers={"Origin": "http://testserver"},
+    )
+    assert login.status_code == 200
+    assert client.get("/api/geofences").status_code == 200
+
+    logout = client.post("/api/session/logout")
+    assert logout.status_code == 200
+    assert client.get("/api/geofences").status_code == 401
+    client.cookies.clear()

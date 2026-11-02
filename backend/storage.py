@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -9,8 +10,21 @@ from pathlib import Path
 from python.gps_core import Geofence, Position
 
 
-# Retain only the most recent GPS observations to bound disk usage and exposure.
-POSITION_RETENTION_LIMIT = 10_000
+# GPS deletion is OPT-IN. Never silently migrate or truncate existing databases.
+# Configure a positive bound only after backing up the database.
+def _retention_limit_from_environment() -> int | None:
+    setting = os.getenv("SENTINEL_POSITION_RETENTION_LIMIT", "").strip()
+    if not setting:
+        return None
+    if not setting.isascii() or not setting.isdecimal():
+        raise ValueError("SENTINEL_POSITION_RETENTION_LIMIT must be an integer from 1 to 1000000")
+    value = int(setting)
+    if not 1 <= value <= 1_000_000:
+        raise ValueError("SENTINEL_POSITION_RETENTION_LIMIT must be an integer from 1 to 1000000")
+    return value
+
+
+POSITION_RETENTION_LIMIT = _retention_limit_from_environment()
 
 
 class GeofenceStore:
@@ -39,11 +53,6 @@ class GeofenceStore:
                     CREATE INDEX IF NOT EXISTS idx_positions_timestamp_id
                     ON positions(timestamp DESC, id DESC)
                 """)
-                # Also migrate existing installations on startup, not only new writes.
-                connection.execute("""
-                    DELETE FROM positions WHERE id NOT IN
-                        (SELECT id FROM positions ORDER BY id DESC LIMIT ?)
-                """, (POSITION_RETENTION_LIMIT,))
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.path)
@@ -80,10 +89,13 @@ class GeofenceStore:
                     "INSERT INTO positions (latitude, longitude, timestamp) VALUES (?, ?, ?)",
                     (position.latitude, position.longitude, position.timestamp),
                 )
-                connection.execute("""
-                    DELETE FROM positions WHERE id NOT IN
-                        (SELECT id FROM positions ORDER BY id DESC LIMIT ?)
-                """, (POSITION_RETENTION_LIMIT,))
+                # Deletion is an explicit operator choice, never triggered by startup.
+                # When opted in, it runs atomically only after a new GPS observation.
+                if POSITION_RETENTION_LIMIT is not None:
+                    connection.execute("""
+                        DELETE FROM positions WHERE id NOT IN
+                            (SELECT id FROM positions ORDER BY id DESC LIMIT ?)
+                    """, (POSITION_RETENTION_LIMIT,))
 
     def list_positions(self, limit: int = 100) -> list[Position]:
         safe_limit = max(1, min(limit, 1000))

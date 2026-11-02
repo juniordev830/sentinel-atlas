@@ -649,6 +649,31 @@
       .overview-stat span { font-size: 10px; line-height: 1.4; }
       .overview-stat { border-color: rgba(103, 232, 249, .16); }
       .overview-foot { color: #a4b9ca; }
+      .render-quality-control {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        white-space: nowrap;
+        color: #bae6fd;
+        font: 600 10px 'JetBrains Mono', monospace;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+      }
+      #render-quality {
+        width: auto;
+        min-height: 36px;
+        padding: 7px 25px 7px 9px;
+        border: 1px solid rgba(103, 232, 249, .5);
+        border-radius: 8px;
+        color: #e0f7ff;
+        background: #0a1c30;
+        font: 500 11px 'JetBrains Mono', monospace;
+        cursor: pointer;
+      }
+      #render-quality:focus-visible {
+        outline: 2px solid #67e8f9;
+        outline-offset: 3px;
+      }
       .tool-actions button[aria-pressed="true"] {
         border-color: rgba(103, 232, 249, .65);
         background: rgba(8, 145, 178, .22);
@@ -900,7 +925,15 @@
             <div class="tool-actions" role="group" aria-label="Ferramentas do mapa">
           <button id="my-location">📍 Minha localização</button>
           <button id="replay-history">⏱️ Histórico</button>
-          <button id="texture-toggle">☀️ Luz do dia</button>
+          <button id="texture-toggle">🌙 Luz noturna</button>
+          <label class="render-quality-control" for="render-quality">Detalhes
+            <select id="render-quality" title="Qualidade de renderização do globo">
+              <option value="auto">Automático</option>
+              <option value="ultra">Ultra · 3D</option>
+              <option value="balanced">Equilibrado</option>
+              <option value="eco">Econômico</option>
+            </select>
+          </label>
           <button id="rotation-toggle" aria-pressed="true" title="Controlar o giro automático do globo">⏸️ Pausar giro</button>
           <button id="reset-camera" title="Recentralizar o globo em uma visão global">🎯 Visão global</button>
           <button id="map-view" aria-pressed="false">🛰️ Mapa satélite</button>
@@ -1005,7 +1038,7 @@
         night: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-night.jpg',
         day: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-blue-marble.jpg',
       };
-      let currentTexture = 'night';
+      let currentTexture = 'day';
       let replayTimer;
       let positionSocket;
 
@@ -1087,7 +1120,7 @@
         .backgroundImageUrl('https://unpkg.com/three-globe@2.43.0/example/img/night-sky.png')
         .showAtmosphere(true)
         .atmosphereColor('#38bdf8')
-        .atmosphereAltitude(0.25)
+        .atmosphereAltitude(0.18)
         .pointLat('lat').pointLng('lng').pointAltitude('altitude').pointColor('color').pointRadius(0.5)
         .pointLabel(d => `<div style="background:rgba(15,23,42,0.92);padding:6px 10px;border-radius:8px;border:1px solid rgba(56,189,248,0.35);font-family:sans-serif;font-size:12px;box-shadow:0 8px 16px rgba(0,0,0,0.5);"><b>${escapeHtml(d.label)}</b><br><span style="color:#94a3b8;font-size:10px;">${escapeHtml(d.type === 'earthquake' ? 'USGS · Fonte Pública' : String(d.type).toUpperCase() + ' · Ativo Tático')}</span></div>`)
         .onPointClick(asset => {
@@ -1170,43 +1203,115 @@
         .ringPropagationSpeed('propagationSpeed').ringRepeatPeriod('repeatPeriod')
         .pointsData(getFilteredPoints('all'));
 
-      // Ajuste de brilho e brilho especular do oceano no material do Three.js
+      // Iluminação cinematográfica simulada: não representa a incidência solar em tempo real.
       const globeMaterial = globe.globeMaterial();
-      if (globeMaterial) {
-        globeMaterial.bumpScale = 12;
-        if (window.THREE) {
-          globeMaterial.specular = new THREE.Color('#38bdf8');
-          globeMaterial.shininess = 20;
+      let cloudsMesh = null;
+      if (window.THREE) {
+        try {
+          const sun = new THREE.DirectionalLight(0xfff1d6, 1.55);
+          sun.position.set(-150, 75, 125);
+          const skyBounce = new THREE.AmbientLight(0x8fbedb, 0.55);
+          globe.lights?.([skyBounce, sun]);
+          if (globeMaterial) {
+            globeMaterial.specular = new THREE.Color('#40667d');
+            globeMaterial.shininess = 28;
+          }
+          const webglRenderer = globe.renderer?.();
+          if (webglRenderer && THREE.ACESFilmicToneMapping !== undefined) {
+            webglRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+            webglRenderer.toneMappingExposure = 1.25;
+          }
+        } catch (error) {
+          console.info('Iluminação avançada indisponível; usando iluminação padrão.', error);
         }
       }
 
-      // Adicionar camada de nuvens 3D flutuantes com rotação independente
+      // Nuvens independentes em uma esfera sutilmente elevada.
       if (window.THREE) {
-        new THREE.TextureLoader().load('https://unpkg.com/three-globe@2.43.0/example/img/clouds.png', cloudsTexture => {
-          const clouds = new THREE.Mesh(
-            new THREE.SphereGeometry(globe.getGlobeRadius() * 1.012, 64, 64),
-            new THREE.MeshPhongMaterial({
-              map: cloudsTexture,
-              transparent: true,
-              opacity: 0.38,
-              depthWrite: false
-            })
-          );
-          globe.scene().add(clouds);
+        new THREE.TextureLoader().load(
+          'https://raw.githubusercontent.com/vasturiano/globe.gl/master/example/clouds/clouds.png',
+          cloudsTexture => {
+            cloudsMesh = new THREE.Mesh(
+              new THREE.SphereGeometry(globe.getGlobeRadius() * 1.006, 96, 96),
+              new THREE.MeshPhongMaterial({
+                map: cloudsTexture,
+                transparent: true,
+                opacity: 0.27,
+                depthWrite: false,
+                side: THREE.FrontSide
+              })
+            );
+            globe.scene().add(cloudsMesh);
+            applyRenderQuality();
 
-          (function rotateClouds() {
-            if (rotationRequested && !document.hidden && !document.body.classList.contains('map-mode')) {
-              clouds.rotation.y += 0.0002;
-            }
-            requestAnimationFrame(rotateClouds);
-          })();
-        });
+            (function rotateClouds() {
+              if (cloudsMesh?.visible && rotationRequested && !document.hidden &&
+                  !document.body.classList.contains('map-mode')) {
+                cloudsMesh.rotation.y += 0.00012;
+              }
+              requestAnimationFrame(rotateClouds);
+            })();
+          },
+          undefined,
+          () => console.info('Textura de nuvens indisponível; globo continua operando.')
+        );
       }
 
       globe.controls().autoRotateSpeed = 0.25;
       globe.controls().enableDamping = true;
 
       const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const renderQualityControl = document.getElementById('render-quality');
+
+      function getRenderProfile(requested, devicePixelRatio = 1, compact = false, reducedMotion = false) {
+        const modes = {
+          ultra: { dpr: 2, curvature: 1.5, points: 18, arcSegments: 96, arcRadial: 10, atmosphere: .19, bump: 2.5, clouds: true, opacity: .30 },
+          balanced: { dpr: 1.5, curvature: 3, points: 12, arcSegments: 64, arcRadial: 6, atmosphere: .17, bump: 1.8, clouds: true, opacity: .24 },
+          eco: { dpr: 1, curvature: 6, points: 6, arcSegments: 30, arcRadial: 4, atmosphere: .12, bump: .75, clouds: false, opacity: 0 }
+        };
+        const resolved = requested === 'auto'
+          ? (compact || reducedMotion ? 'eco' : 'balanced')
+          : (Object.hasOwn(modes, requested) ? requested : 'balanced');
+        const profile = modes[resolved];
+        return { ...profile, mode: resolved, pixelRatio: Math.min(Math.max(Number(devicePixelRatio) || 1, 1), profile.dpr) };
+      }
+
+      function applyRenderQuality() {
+        const profile = getRenderProfile(
+          renderQualityControl.value,
+          window.devicePixelRatio || 1,
+          window.matchMedia('(max-width: 768px)').matches,
+          motionPreference.matches
+        );
+        // Os métodos são opcionais para manter compatibilidade com versões antigas da biblioteca.
+        const renderer = globe.renderer?.();
+        renderer?.setPixelRatio?.(profile.pixelRatio);
+        globe.globeCurvatureResolution?.(profile.curvature);
+        globe.pointResolution?.(profile.points);
+        globe.arcCurveResolution?.(profile.arcSegments);
+        globe.arcCircularResolution?.(profile.arcRadial);
+        globe.atmosphereAltitude?.(profile.atmosphere);
+        if (globeMaterial) {
+          globeMaterial.bumpScale = profile.bump;
+          globeMaterial.needsUpdate = true;
+        }
+        if (cloudsMesh) {
+          cloudsMesh.visible = profile.clouds;
+          cloudsMesh.material.opacity = profile.opacity;
+        }
+        renderQualityControl.dataset.resolved = profile.mode;
+        renderQualityControl.title = 'Qualidade ativa: ' + profile.mode +
+          ' · resolução ' + profile.pixelRatio.toFixed(2) + '×';
+      }
+      renderQualityControl.addEventListener('change', applyRenderQuality);
+      motionPreference.addEventListener?.('change', () => {
+        if (renderQualityControl.value === 'auto') applyRenderQuality();
+      });
+      window.addEventListener('resize', () => {
+        if (renderQualityControl.value === 'auto') applyRenderQuality();
+      });
+      applyRenderQuality();
+
       const rotationToggle = document.getElementById('rotation-toggle');
       let rotationRequested = !motionPreference.matches;
 

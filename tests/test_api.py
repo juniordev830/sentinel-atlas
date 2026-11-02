@@ -249,3 +249,14 @@ def test_browser_session_logout_clears_cookie(monkeypatch):
     assert logout.status_code == 200
     assert client.get("/api/geofences").status_code == 401
     client.cookies.clear()
+
+
+
+@pytest.mark.parametrize("cookie_value", ["0.invalid", "not-a-session", "9999999999.invalid"])
+def test_browser_session_rejects_expired_or_forged_cookie(monkeypatch, cookie_value):
+    _configure_browser_auth(monkeypatch)
+    client.cookies.set("sentinel_session", cookie_value)
+
+    response = client.get("/api/geofences")
+    assert response.status_code == 401
+    client.cookies.clear()

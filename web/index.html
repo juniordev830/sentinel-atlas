@@ -606,7 +606,7 @@
     <div id="globe" aria-label="Globo 3D com dados simulados de localização"></div>
     <div id="globe-fallback" hidden role="status">
       <div class="fallback-orb" aria-hidden="true"></div>
-      <div class="fallback-message"><strong>Globo 3D indisponível</strong>Não foi possível carregar a visualização interativa. Verifique a conexão e recarregue a página.</div>
+      <div class="fallback-message"><strong>Globo 3D indisponível</strong>Confira a conexão e o suporte a WebGL do navegador e recarregue a página.</div>
     </div>
     <div class="hud">
       <div class="topbar">
@@ -1312,7 +1312,7 @@
       function showGlobeFallback() {
         document.getElementById('globe-fallback').hidden = false;
         document.getElementById('overview-globe').textContent = 'INDISPONÍVEL';
-        document.getElementById('api-status').textContent = 'GLOBO 3D INDISPONÍVEL · verifique a conexão';
+        document.getElementById('api-status').textContent = 'GLOBO 3D INDISPONÍVEL';
         setGlobeControlsEnabled(false);
       }
 

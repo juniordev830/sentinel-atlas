@@ -28,7 +28,7 @@ test('troca para o mapa e permite voltar ao globo', () => {
   const button = { textContent: '', attrs: {}, setAttribute(name, value) { this.attrs[name] = value; } };
   const document = { body, getElementById: () => button };
   const code = snippet('function setMapView(enabled)', "document.getElementById('map-view').addEventListener");
-  const context = { document };
+  const context = { document, updateRotation() {} };
   vm.runInNewContext(code + '\nglobalThis.setMapView = setMapView;', context);
   context.setMapView(true);
   assert.equal(body.classList.contains('map-mode'), true);
@@ -166,4 +166,149 @@ test('mantém o aviso e desativa os controles quando o WebGL falha', () => {
   assert.equal(overview.textContent, 'INDISPONÍVEL');
   assert.match(status.textContent, /GLOBO 3D INDISPONÍVEL/);
   assert.ok(controls.every(control => control.disabled));
+});
+
+test('controle de rotação respeita movimento reduzido, aba oculta e modo mapa', () => {
+  const rotation = { autoRotate: false };
+  const events = {};
+  const button = {
+    attrs: {},
+    setAttribute(name, value) { this.attrs[name] = value; },
+    addEventListener(name, handler) { this[name] = handler; }
+  };
+  const reset = { addEventListener(name, handler) { this[name] = handler; } };
+  const body = { classList: classList() };
+  const document = {
+    hidden: false, body,
+    getElementById(id) { return id === 'rotation-toggle' ? button : reset; },
+    addEventListener(name, handler) { events[name] = handler; }
+  };
+  const media = {
+    matches: true,
+    addEventListener(name, handler) { events.motion = handler; }
+  };
+  const context = {
+    document, window: { matchMedia: () => media },
+    globe: { controls: () => rotation }
+  };
+  vm.runInNewContext(
+    snippet("globe.controls().autoRotateSpeed = 0.25;", '// Atualiza bússola'),
+    context
+  );
+  assert.equal(rotation.autoRotate, false, 'movimento reduzido desliga o giro inicialmente');
+  assert.equal(button.attrs['aria-pressed'], 'false');
+  button.click();
+  assert.equal(rotation.autoRotate, true);
+  document.hidden = true;
+  events.visibilitychange();
+  assert.equal(rotation.autoRotate, false);
+  document.hidden = false;
+  body.classList.add('map-mode');
+  events.visibilitychange();
+  assert.equal(rotation.autoRotate, false);
+  body.classList.remove('map-mode');
+  events.visibilitychange();
+  assert.equal(rotation.autoRotate, true);
+  events.motion({ matches: true });
+  assert.equal(rotation.autoRotate, false);
+});
+
+test('recentralizar retorna ao globo e fecha o inspetor', () => {
+  let mapEnabled = null;
+  let camera = null;
+  const inspector = { hidden: false };
+  const button = { addEventListener(name, handler) { this[name] = handler; } };
+  const context = {
+    document: { getElementById: id => id === 'reset-camera' ? button : inspector },
+    globe: { pointOfView(position, duration) { camera = { position, duration }; } },
+    setMapView(value) { mapEnabled = value; }
+  };
+  vm.runInNewContext(
+    snippet('function resetGlobalView()', '// Atualiza bússola'), context
+  );
+  button.click();
+  assert.equal(mapEnabled, false);
+  assert.equal(inspector.hidden, true);
+  assert.equal(camera.position.altitude, 2.5);
+  assert.equal(camera.duration, 900);
+});
+
+test('API com lista vazia remove geofences demonstrativas e atualiza busca', async () => {
+  let ringCount = -1;
+  let badges = 0;
+  let searchUpdates = 0;
+  const context = {
+    loadedGeofences: [{ name: 'Demo' }],
+    globe: { ringsData(data) { ringCount = data.length; } },
+    buildRingsData: () => [],
+    updateBadges() { badges++; },
+    applyAssetSearch() { searchUpdates++; },
+    fetch: async () => ({ ok: true, json: async () => [] }),
+    console
+  };
+  vm.runInNewContext(
+    snippet('async function fetchBackendGeofences()', 'fetchBackendGeofences();'),
+    context
+  );
+  await context.fetchBackendGeofences();
+  assert.equal(context.loadedGeofences.length, 0);
+  assert.equal(ringCount, 0);
+  assert.equal(badges, 1);
+  assert.equal(searchUpdates, 1);
+});
+
+test('atualização de camada mantém filtro de pesquisa ativo', () => {
+  const assets = [{ id: 'original', type: 'earthquake' }];
+  let searched = 0;
+  let refreshed = 0;
+  let globeUpdated = 0;
+  const context = {
+    assets,
+    document: {
+      querySelector: () => ({ dataset: { layer: 'earthquake' } }),
+      getElementById: () => ({ value: 'Recife' })
+    },
+    applyAssetSearch() { searched++; },
+    updateBadges() { refreshed++; },
+    globe: { pointsData() { globeUpdated++; } },
+    getFilteredPoints: () => []
+  };
+  vm.runInNewContext(
+    snippet('function replaceAssets(type, incoming)', 'function getFilteredPoints(layer)'),
+    context
+  );
+  context.replaceAssets('earthquake', [{ id: 'new', type: 'earthquake' }]);
+  assert.equal(searched, 1);
+  assert.equal(globeUpdated, 0);
+  assert.equal(refreshed, 1);
+  assert.equal(assets[0].id, 'new');
+});
+
+test('pesquisa textual respeita a camada visual selecionada', () => {
+  const field = { value: 'Recife' };
+  const feedback = { textContent: '' };
+  const rendered = [];
+  const context = {
+    assetSearchInput: field, searchFeedback: feedback,
+    assets: [
+      { id: 'flight', type: 'aircraft', label: 'Avião Recife', lat: -8, lng: -35 },
+      { id: 'ship', type: 'ship', label: 'Navio Recife', lat: -8, lng: -35 }
+    ],
+    loadedGeofences: [{ name: 'Recife', latitude: -8, longitude: -35, radius_meters: 100 }],
+    document: { querySelector: () => ({ dataset: { layer: 'aircraft' } }) },
+    globe: {
+      pointsData(points) { rendered.push(points); },
+      pointOfView() {}
+    },
+    getFilteredPoints() { return []; }
+  };
+  vm.runInNewContext(
+    snippet('function applyAssetSearch()', "assetSearchInput.addEventListener('input', applyAssetSearch);"),
+    context
+  );
+  context.applyAssetSearch();
+  assert.equal(rendered.length, 1);
+  assert.equal(rendered[0].length, 1);
+  assert.equal(rendered[0][0].type, 'aircraft');
+  assert.match(feedback.textContent, /1 RESULTADO/);
 });

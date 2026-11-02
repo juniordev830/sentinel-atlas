@@ -15,7 +15,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Query, Response
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, ValidationError
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -32,14 +32,58 @@ from backend.ai import GeoINTAnalyzer  # noqa: E402
 from backend.location import get_location_info  # noqa: E402
 
 
+
+def validate_analysis_items(items, *, fences=False):
+    import math
+    if not isinstance(items, list) or len(items) > (500 if fences else 1000):
+        raise ValueError("Lista de análise inválida ou excessiva")
+    for item in items:
+        if not isinstance(item, dict):
+            raise ValueError("Cada item deve ser um objeto")
+        lat = item.get("latitude", item.get("lat"))
+        lon = item.get("longitude", item.get("lon"))
+        for value, bound in ((lat, 90), (lon, 180)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or abs(value) > bound:
+                raise ValueError("Coordenadas inválidas")
+        if fences:
+            radius = item.get("radius_meters", 1000)
+            if isinstance(radius, bool) or not isinstance(radius, (int, float)) or not math.isfinite(radius) or not 0 < radius <= 1000000:
+                raise ValueError("Raio inválido")
+        for key in ("name", "callsign", "id", "type"):
+            if key in item and (not isinstance(item[key], str) or len(item[key]) > 160):
+                raise ValueError("Identificador inválido")
+        for key in ("speed", "velocity"):
+            if key in item:
+                value = item[key]
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                    raise ValueError("Velocidade inválida")
+    return items
+
 class AIAnalyzeInput(BaseModel):
     assets: list[dict[str, Any]] = Field(default_factory=list, max_length=1000)
     geofences: list[dict[str, Any]] = Field(default_factory=list, max_length=500)
+
+    @field_validator("assets")
+    @classmethod
+    def validate_assets(cls, values):
+        return validate_analysis_items(values)
+
+    @field_validator("geofences")
+    @classmethod
+    def validate_fences(cls, values):
+        return validate_analysis_items(values, fences=True)
 
 
 class AIQueryInput(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     context: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("context")
+    @classmethod
+    def validate_context(cls, value):
+        validate_analysis_items(value.get("assets", []))
+        validate_analysis_items(value.get("geofences", []), fences=True)
+        return value
 
 
 class GeofenceInput(BaseModel):
@@ -472,7 +516,11 @@ async def positions(websocket: WebSocket) -> None:
             if len(message.encode("utf-8")) > 16_384:
                 await websocket.close(code=1009, reason="Mensagem excede o limite de 16 KiB")
                 return
-            payload = PositionInput.model_validate_json(message)
+            try:
+                payload = PositionInput.model_validate_json(message)
+            except ValidationError:
+                await websocket.close(code=1008, reason="Posição inválida")
+                return
             position = Position(payload.latitude, payload.longitude, payload.timestamp if payload.timestamp is not None else time.time())
             store.save_position(position)
             events = []

@@ -172,4 +172,11 @@ Este repositório é um projeto de portfólio em evolução. Recursos e integra�
 
 ## Segurança para produção
 
-A API exige a variável SENTINEL_API_TOKEN com pelo menos 32 caracteres quando SENTINEL_ENV=production; a aplicação falha na inicialização se essa configuração estiver ausente ou fraca. Use um segredo aleatório guardado no gerenciador de segredos do ambiente, nunca versionado no Git. As rotas /api/health e /api/public-config são públicas intencionais; todas as demais rotas /api/ exigem Authorization: Bearer <token> quando o token está configurado.
+A API exige `SENTINEL_API_TOKEN` com pelo menos 32 caracteres quando `SENTINEL_ENV=production`; a aplicação falha na inicialização se essa configuração estiver ausente ou fraca. Use um segredo aleatório guardado no gerenciador de segredos do ambiente, nunca versionado no Git.
+
+- As rotas `/api/health` e `/api/public-config` são públicas intencionais.
+- Clientes de serviço podem autenticar com `Authorization: Bearer <token>`.
+- Para usar o painel no navegador, abra `/login` e informe o token administrativo. O servidor troca o token por um cookie de sessão assinado, `HttpOnly`, `SameSite=Strict` e com validade de uma hora; em produção, o cookie também usa `Secure`.
+- O token não é salvo em `localStorage`, não é inserido no JavaScript do painel e não é enviado na URL. O cookie é enviado automaticamente pelo navegador nas chamadas HTTP e WebSocket da mesma origem.
+- Requisições mutáveis autenticadas por cookie e a conexão WebSocket validam a origem. Mantenha HTTPS em produção.
+- O token administrativo continua sendo uma credencial compartilhada: esta sessão de navegador não implementa contas individuais, papéis ou isolamento de dados por usuário. Não exponha o serviço multiusuário antes de implementar autorização por tenant/objeto e limitação de tentativas no proxy de borda.

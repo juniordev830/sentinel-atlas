@@ -355,3 +355,44 @@ test('camada tática é decorativa e não intercepta cliques no globo', () => {
   assert.match(html, /id="focus-mode" aria-pressed="false"/);
   assert.match(html, /@media \(prefers-reduced-motion: reduce\)/);
 });
+
+test('perfis de renderização limitam resolução e protegem dispositivos móveis', () => {
+  const context = {};
+  vm.runInNewContext(
+    snippet('function getRenderProfile(', 'function applyRenderQuality()'),
+    context
+  );
+  const profile = context.getRenderProfile;
+  const ultra = profile('ultra', 3.25, false, false);
+  assert.equal(ultra.mode, 'ultra');
+  assert.equal(ultra.pixelRatio, 2, 'Ultra é limitado a 2x mesmo com DPR mais alto');
+  assert.equal(ultra.clouds, true);
+  assert.ok(ultra.curvature < 3);
+  const mobile = profile('auto', 3, true, false);
+  assert.equal(mobile.mode, 'eco');
+  assert.equal(mobile.pixelRatio, 1);
+  assert.equal(mobile.clouds, false);
+  assert.equal(profile('auto', 2, false, false).mode, 'balanced');
+  assert.equal(profile('auto', 2, false, true).mode, 'eco');
+  assert.equal(profile('indefinido', 1.25, false, false).mode, 'balanced');
+  assert.equal(profile('ultra', -7, false, false).pixelRatio, 1);
+});
+
+test('painel oferece qualidade selecionável e modo terrestre diurno por padrão', () => {
+  assert.match(html, /<select id="render-quality"/);
+  assert.match(html, /<option value="ultra">Ultra/);
+  assert.match(html, /<option value="balanced">Equilibrado/);
+  assert.match(html, /<option value="eco">Econômico/);
+  assert.match(html, /let currentTexture = 'day'/);
+  assert.match(html, /new THREE\.DirectionalLight\(/);
+  assert.match(html, /globe\.renderer\?\.\(\)/);
+  assert.match(html, /new THREE\.SphereGeometry\(globe\.getGlobeRadius\(\) \* 1\.006/);
+});
+
+test('perfil reduz nuvens e densidade geométrica sem remover interações de clique', () => {
+  const htmlQuality = snippet('function applyRenderQuality()', "renderQualityControl.addEventListener('change', applyRenderQuality);");
+  assert.match(htmlQuality, /cloudsMesh\.visible = profile\.clouds/);
+  assert.match(htmlQuality, /globe\.pointResolution\?\.\(profile\.points\)/);
+  assert.match(htmlQuality, /globe\.globeCurvatureResolution\?\.\(profile\.curvature\)/);
+  assert.doesNotMatch(htmlQuality, /enablePointerInteraction\(false\)/);
+});

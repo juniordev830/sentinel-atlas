@@ -506,6 +506,11 @@
       .overview-stat span { font-size: 10px; line-height: 1.4; }
       .overview-stat { border-color: rgba(103, 232, 249, .16); }
       .overview-foot { color: #a4b9ca; }
+      .tool-actions button[aria-pressed="true"] {
+        border-color: rgba(103, 232, 249, .65);
+        background: rgba(8, 145, 178, .22);
+        color: #e0faff;
+      }
       .control-deck {
         flex: 1;
         min-width: 0;
@@ -696,6 +701,8 @@
           <button id="my-location">📍 Minha localização</button>
           <button id="replay-history">⏱️ Histórico</button>
           <button id="texture-toggle">☀️ Luz do dia</button>
+          <button id="rotation-toggle" aria-pressed="true" title="Controlar o giro automático do globo">⏸️ Pausar giro</button>
+          <button id="reset-camera" title="Recentralizar o globo em uma visão global">🎯 Visão global</button>
           <button id="map-view" aria-pressed="false">🛰️ Mapa satélite</button>
           <button id="toggle-ai" style="border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,0.15);">🤖 Copiloto IA</button>
             </div>
@@ -810,7 +817,11 @@
         }
         assets.push(...incoming);
         const activeFilter = document.querySelector('[data-layer].active')?.dataset.layer || 'all';
-        globe.pointsData(getFilteredPoints(activeFilter));
+        if (document.getElementById('asset-search')?.value.trim()) {
+          applyAssetSearch();
+        } else {
+          globe.pointsData(getFilteredPoints(activeFilter));
+        }
         updateBadges();
       }
 
@@ -967,15 +978,45 @@
           globe.scene().add(clouds);
 
           (function rotateClouds() {
-            clouds.rotation.y += 0.0002;
+            if (rotationRequested && !document.hidden && !document.body.classList.contains('map-mode')) {
+              clouds.rotation.y += 0.0002;
+            }
             requestAnimationFrame(rotateClouds);
           })();
         });
       }
 
-      globe.controls().autoRotate = true;
       globe.controls().autoRotateSpeed = 0.25;
       globe.controls().enableDamping = true;
+
+      const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const rotationToggle = document.getElementById('rotation-toggle');
+      let rotationRequested = !motionPreference.matches;
+
+      function updateRotation() {
+        globe.controls().autoRotate = rotationRequested &&
+          !document.hidden && !document.body.classList.contains('map-mode');
+        rotationToggle.setAttribute('aria-pressed', String(rotationRequested));
+        rotationToggle.textContent = rotationRequested ? '⏸️ Pausar giro' : '▶️ Retomar giro';
+      }
+
+      rotationToggle.addEventListener('click', () => {
+        rotationRequested = !rotationRequested;
+        updateRotation();
+      });
+      document.addEventListener('visibilitychange', updateRotation);
+      motionPreference.addEventListener?.('change', event => {
+        rotationRequested = !event.matches;
+        updateRotation();
+      });
+      updateRotation();
+
+      function resetGlobalView() {
+        setMapView(false);
+        globe.pointOfView({ lat: 0, lng: -30, altitude: 2.5 }, 900);
+        document.getElementById('inspector').hidden = true;
+      }
+      document.getElementById('reset-camera').addEventListener('click', resetGlobalView);
 
       // Atualiza bússola e coordenadas HUD no movimento da câmera
       function updateHUD() {
@@ -1009,10 +1050,12 @@
           const res = await fetch('/api/geofences');
           if (res.ok) {
             const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
+            if (Array.isArray(data)) {
+              // Uma lista vazia significa zero áreas cadastradas, não geofences simuladas.
               loadedGeofences = data;
               globe.ringsData(buildRingsData());
               updateBadges();
+              applyAssetSearch();
             }
           }
         } catch (e) {
@@ -1290,6 +1333,7 @@
       }
       function setMapView(enabled) {
         document.body.classList.toggle('map-mode', enabled);
+        updateRotation();
         const button = document.getElementById('map-view');
         button.textContent = enabled ? '🌐 Voltar ao globo' : '🛰️ Mapa satélite';
         button.setAttribute('aria-pressed', String(enabled));

@@ -17,6 +17,17 @@ O **Sentinel Atlas** reúne um núcleo de geolocalização em Python, uma API as
 - **Fontes externas:** integrações opcionais com serviços públicos e provedores que exigem credenciais.
 - **Execução reproduzível:** suporte a Docker e verificações automatizadas via GitHub Actions.
 
+## Como usar o painel visual
+
+No painel do **God's Eye View**, a área **Camadas** filtra os tipos de objetos e a área **Ferramentas** oferece controles do globo.
+
+- **⏸️ Pausar giro / ▶️ Retomar giro:** liga ou desliga a rotação automática; a rotação também é suspensa quando a aba fica oculta ou o usuário abre o mapa 2D. A preferência de acessibilidade por movimento reduzido é respeitada inicialmente e quando alterada.
+- **🎯 Visão global:** fecha o inspetor, retorna do mapa 2D (se necessário) e recentraliza a câmera do globo.
+- **Busca de objetos:** digite nomes ou identificadores; a busca considera a camada selecionada e continua aplicada quando a fonte de dados atualiza. Pressione `/` para focar a busca e `Esc` para limpá-la.
+- **Geofences:** quando a API responde com uma lista vazia, o painel deixa de exibir geofences demonstrativas para evitar confusão com registros reais.
+
+**Importante:** avião, navio, trânsito e parte dos satélites exibidos inicialmente são *dados simulados*. Camadas externas (como USGS) e outras integrações só devem ser consideradas atualizadas após respostas bem-sucedidas de suas respectivas fontes. A indicação de API online não significa que todos os provedores externos estejam operacionais.
+
 ## Arquitetura
 
 | Componente | Responsabilidade |

@@ -44,16 +44,34 @@ class GeofenceStoreTests(unittest.TestCase):
                 assert [item.timestamp for item in store.list_positions(100)] == [4.0, 3.0, 2.0]
                 assert [f.name for f in store.list()] == ["porto"]
 
-    def test_gps_retention_prunes_existing_database_on_reopen(self):
+    def test_existing_database_is_never_pruned_at_startup(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "sentinel.sqlite3"
-            with patch("backend.storage.POSITION_RETENTION_LIMIT", 5):
+            with patch("backend.storage.POSITION_RETENTION_LIMIT", None):
                 store = GeofenceStore(path)
                 for index in range(5):
                     store.save_position(Position(-5.8, -35.2, float(index)))
             with patch("backend.storage.POSITION_RETENTION_LIMIT", 2):
                 reopened = GeofenceStore(path)
-                assert [item.timestamp for item in reopened.list_positions(100)] == [4.0, 3.0]
+                # Simply starting a new process must not erase historical GPS data.
+                assert [item.timestamp for item in reopened.list_positions(100)] == [4.0, 3.0, 2.0, 1.0, 0.0]
+                # Only an opt-in writer can apply the operator's retention policy.
+                reopened.save_position(Position(-5.8, -35.2, 5.0))
+                assert [item.timestamp for item in reopened.list_positions(100)] == [5.0, 4.0]
+
+    def test_default_retention_is_disabled_without_configuration(self):
+        import os
+        from backend.storage import _retention_limit_from_environment
+        with patch.dict(os.environ, {}, clear=True):
+            assert _retention_limit_from_environment() is None
+
+    def test_retention_rejects_invalid_configuration(self):
+        import os
+        from backend.storage import _retention_limit_from_environment
+        for value in ("0", "-1", "abc", "1000001", "1.5"):
+            with patch.dict(os.environ, {"SENTINEL_POSITION_RETENTION_LIMIT": value}):
+                with self.assertRaises(ValueError):
+                    _retention_limit_from_environment()
 
     def test_gps_timestamps_with_ties_have_stable_order(self):
         with tempfile.TemporaryDirectory() as directory:

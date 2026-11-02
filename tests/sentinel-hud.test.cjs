@@ -373,6 +373,9 @@ test('perfis de renderização limitam resolução e protegem dispositivos móve
   assert.equal(mobile.pixelRatio, 1);
   assert.equal(mobile.clouds, false);
   assert.equal(profile('auto', 2, false, false).mode, 'balanced');
+  assert.equal(profile('auto', 2, false, false, 16, 12).mode, 'ultra');
+  assert.equal(profile('auto', 2, false, false, 4, 8).mode, 'balanced');
+  assert.equal(profile('auto', 2, true, false, 16, 12).mode, 'eco');
   assert.equal(profile('auto', 2, false, true).mode, 'eco');
   assert.equal(profile('indefinido', 1.25, false, false).mode, 'balanced');
   assert.equal(profile('ultra', -7, false, false).pixelRatio, 1);

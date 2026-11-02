@@ -89,3 +89,53 @@ test('resumo informa se a API respondeu ao health check', async () => {
   assert.equal(overview.classList.contains('green'), false);
   assert.match(status.textContent, /API não conectada/);
 });
+
+test('aguarda a biblioteca gráfica carregar e inicializa apenas uma vez', () => {
+  let load;
+  let timeout;
+  let starts = 0;
+  let fallbacks = 0;
+  const fallback = { hidden: false };
+  const overview = { textContent: '' };
+  const context = {
+    document: {
+      querySelector: () => ({ addEventListener(name, callback) { load = callback; } }),
+      getElementById: id => id === 'globe-fallback' ? fallback : overview
+    },
+    setTimeout(callback) { timeout = callback; return 1; },
+    clearTimeout() {},
+    initializeSentinel() { starts++; },
+    setGlobeControlsEnabled() {},
+    showGlobeFallback() { fallbacks++; },
+    console
+  };
+  const code = snippet('function bootSentinel()', 'bootSentinel();');
+  vm.runInNewContext(code + '\nglobalThis.bootSentinel = bootSentinel;', context);
+  context.bootSentinel();
+  assert.equal(starts, 0);
+  context.Globe = () => {};
+  load();
+  load();
+  timeout();
+  assert.equal(starts, 1);
+  assert.equal(fallback.hidden, true);
+  assert.equal(overview.textContent, 'ATIVO');
+  assert.equal(fallbacks, 0);
+});
+
+test('informa indisponibilidade quando a biblioteca gráfica não carrega', () => {
+  let timeout;
+  let fallbacks = 0;
+  const context = {
+    document: { querySelector: () => null },
+    setTimeout(callback) { timeout = callback; return 1; },
+    clearTimeout() {},
+    showGlobeFallback() { fallbacks++; },
+    console
+  };
+  const code = snippet('function bootSentinel()', 'bootSentinel();');
+  vm.runInNewContext(code + '\nglobalThis.bootSentinel = bootSentinel;', context);
+  context.bootSentinel();
+  timeout();
+  assert.equal(fallbacks, 1);
+});

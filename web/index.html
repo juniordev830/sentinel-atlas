@@ -462,6 +462,30 @@
         pointer-events: none;
         background: radial-gradient(ellipse at center, transparent 38%, rgba(2, 6, 23, .48) 100%);
       }
+      #globe-fallback[hidden] { display: none; }
+      #globe-fallback {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 14px;
+        padding: 24px;
+        pointer-events: none;
+        text-align: center;
+      }
+      .fallback-orb {
+        width: min(48vw, 440px);
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, transparent 20%, rgba(0, 5, 16, .9) 78%),
+          url('https://unpkg.com/three-globe@2.43.0/example/img/earth-night.jpg') 38% center / auto 100%,
+          radial-gradient(circle at 35% 30%, #164e63, #020617 78%);
+        box-shadow: 0 0 45px rgba(34, 211, 238, .16), inset -30px -25px 60px rgba(0, 0, 0, .7);
+      }
+      .fallback-message { max-width: 340px; color: #c4d9e6; line-height: 1.5; }
+      .fallback-message strong { display: block; color: #f0fdff; font-size: 14px; }
+      button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
       .hud { z-index: 10; }
       .brand, .panel {
         border-color: rgba(103, 232, 249, .24);
@@ -578,7 +602,12 @@
     </style>
   </head>
   <body>
-    <div id="globe" aria-label="Globo 3D com dados simulados de localização"></div>
+    <div id="globe" aria-label="Globo 3D com dados simulados de localização">
+      <div id="globe-fallback" hidden role="status">
+        <div class="fallback-orb" aria-hidden="true"></div>
+        <div class="fallback-message"><strong>Globo 3D indisponível</strong>Não foi possível carregar a visualização interativa. Verifique a conexão e recarregue a página.</div>
+      </div>
+    </div>
     <div class="hud">
       <div class="topbar">
         <div class="brand">
@@ -618,7 +647,7 @@
           <div class="overview-stat"><span>API</span><strong id="overview-api" aria-live="polite">--</strong></div>
         </div>
         <div class="overview-divider"></div>
-        <div class="overview-row"><span>Globo 3D</span><b>ATIVO</b></div>
+        <div class="overview-row"><span>Globo 3D</span><b id="overview-globe">AGUARDANDO</b></div>
         <div class="overview-row"><span>Fontes externas</span><b>OPCIONAIS</b></div>
         <div class="overview-row"><span>Dados</span><b>DEMO + FONTES</b></div>
         <div class="overview-foot">Algumas camadas são simuladas; fontes externas dependem de configuração.</div>
@@ -684,6 +713,7 @@
     </div>
     <div id="map" aria-label="Mapa Google com imagens de satélite e trânsito"></div>
     <script>
+      function initializeSentinel() {
       // No celular, o resumo começa recolhido para preservar espaço para o mapa.
       const overviewPanel = document.getElementById('overview-panel');
       const compactLayout = window.matchMedia('(max-width: 900px)');
@@ -1272,6 +1302,44 @@
           openSatelliteMap();
         }
       });
+      }
+
+      function setGlobeControlsEnabled(enabled) {
+        document.querySelectorAll('[data-layer], .tool-actions button, #asset-search')
+          .forEach(element => { element.disabled = !enabled; });
+      }
+
+      function showGlobeFallback() {
+        document.getElementById('globe-fallback').hidden = false;
+        document.getElementById('overview-globe').textContent = 'INDISPONÍVEL';
+        document.getElementById('api-status').textContent = 'GLOBO 3D INDISPONÍVEL · verifique a conexão';
+        setGlobeControlsEnabled(false);
+      }
+
+      function bootSentinel() {
+        let started = false;
+        let timeout;
+        function startWhenReady() {
+          if (started || typeof Globe !== 'function') return;
+          started = true;
+          clearTimeout(timeout);
+          try {
+            initializeSentinel();
+            const fallback = document.getElementById('globe-fallback');
+            if (fallback) fallback.hidden = true;
+            document.getElementById('overview-globe').textContent = 'ATIVO';
+            setGlobeControlsEnabled(true);
+          } catch (error) {
+            console.error('Falha ao iniciar o globo 3D:', error);
+            showGlobeFallback();
+          }
+        }
+        const loader = document.querySelector('script[src*="globe.gl"]');
+        if (loader) loader.addEventListener('load', startWhenReady, { once: true });
+        startWhenReady();
+        if (!started) timeout = setTimeout(() => { if (!started) showGlobeFallback(); }, 8000);
+      }
+      bootSentinel();
     </script>
   </body>
 </html>

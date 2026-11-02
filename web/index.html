@@ -453,6 +453,149 @@
         *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
       }
 
+
+      /* Command Center 2.0: visualizações decorativas, sem bloquear o globo. */
+      .tactical-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        overflow: hidden;
+        pointer-events: none;
+        background:
+          linear-gradient(180deg, rgba(2, 6, 23, .22), transparent 21%, transparent 75%, rgba(2, 6, 23, .26));
+      }
+      .tactical-overlay::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(103, 232, 249, .09) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(103, 232, 249, .09) 1px, transparent 1px);
+        background-size: 76px 76px;
+        -webkit-mask-image: radial-gradient(ellipse at 50% 50%, transparent 25%, #000 90%);
+        mask-image: radial-gradient(ellipse at 50% 50%, transparent 25%, #000 90%);
+        opacity: .4;
+      }
+      .tactical-overlay::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(transparent 45%, rgba(34, 211, 238, .045) 50%, transparent 55%);
+        background-size: 100% 240px;
+        animation: tactical-scan 18s linear infinite;
+        opacity: .5;
+      }
+      @keyframes tactical-scan {
+        from { background-position: 0 -240px; }
+        to { background-position: 0 100vh; }
+      }
+      .tactical-reticle {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 94px;
+        height: 94px;
+        transform: translate(-50%, -50%);
+        border: 1px solid rgba(103, 232, 249, .17);
+        border-radius: 50%;
+        box-shadow: 0 0 0 29px rgba(103, 232, 249, .018), 0 0 0 63px rgba(103, 232, 249, .015);
+      }
+      .tactical-reticle::before, .tactical-reticle::after {
+        content: "";
+        position: absolute;
+        background: rgba(103, 232, 249, .3);
+      }
+      .tactical-reticle::before { width: 1px; height: 128px; left: 50%; top: -18px; }
+      .tactical-reticle::after { height: 1px; width: 128px; top: 50%; left: -18px; }
+      .tactical-corner {
+        position: absolute;
+        width: 26px;
+        height: 26px;
+        border-color: rgba(34, 211, 238, .52);
+        border-style: solid;
+      }
+      .tactical-corner.tl { top: 13px; left: 13px; border-width: 1px 0 0 1px; }
+      .tactical-corner.tr { top: 13px; right: 13px; border-width: 1px 1px 0 0; }
+      .tactical-corner.bl { bottom: 13px; left: 13px; border-width: 0 0 1px 1px; }
+      .tactical-corner.br { bottom: 13px; right: 13px; border-width: 0 1px 1px 0; }
+      .tactical-caption {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        margin-top: 62px;
+        transform: translateX(-50%);
+        color: rgba(148, 210, 225, .7);
+        font: 500 9px 'JetBrains Mono', monospace;
+        letter-spacing: .22em;
+        white-space: nowrap;
+        text-shadow: 0 2px 8px #020617;
+      }
+      body.map-mode .tactical-overlay { display: none; }
+      .brand { position: relative; overflow: hidden; }
+      .brand::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 58px;
+        height: 58px;
+        background: linear-gradient(125deg, transparent, rgba(34, 211, 238, .08));
+        clip-path: polygon(100% 0, 100% 100%, 0 0);
+      }
+      .brand small {
+        display: inline-block;
+        margin-top: 4px;
+        color: #67e8f9;
+        font: 500 9px 'JetBrains Mono', monospace;
+        letter-spacing: .12em;
+      }
+      .control-deck { border-top: 2px solid rgba(34, 211, 238, .65); }
+      .control-label { color: #7dd3fc; }
+      .filters button, .tool-actions button { white-space: nowrap; }
+      .filters button:hover, .tool-actions button:hover {
+        border-color: rgba(103, 232, 249, .7);
+        box-shadow: 0 0 0 1px rgba(103, 232, 249, .08), 0 5px 18px rgba(8, 145, 178, .13);
+      }
+      #focus-mode { border-color: rgba(125, 211, 252, .42); color: #d6f7ff; }
+      #focus-mode[aria-pressed="true"] {
+        background: rgba(34, 211, 238, .22);
+        border-color: #67e8f9;
+      }
+      body.focus-mode .compass-hud,
+      body.focus-mode .overview-panel,
+      body.focus-mode .bottombar,
+      body.focus-mode .inspector,
+      body.focus-mode .ai-panel,
+      body.focus-mode .search-wrap,
+      body.focus-mode #api-status {
+        display: none !important;
+      }
+      body.focus-mode .topbar { justify-content: space-between; }
+      body.focus-mode .tools { width: auto; }
+      @media (max-width: 900px) {
+        .tactical-reticle { width: 64px; height: 64px; }
+        .tactical-reticle::before { height: 94px; top: -16px; }
+        .tactical-reticle::after { width: 94px; left: -16px; }
+        .tactical-caption { margin-top: 45px; font-size: 8px; }
+        body.focus-mode .hud {
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+        }
+        body.focus-mode .topbar { flex-direction: row; }
+        body.focus-mode .tools { flex: 0 0 auto; }
+      }
+      @media (max-width: 520px) {
+        .tactical-corner { width: 17px; height: 17px; }
+        .tactical-reticle, .tactical-caption { display: none; }
+        .brand small { display: none; }
+        #focus-mode { font-size: 11px; padding-inline: 10px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .tactical-overlay::after { animation: none; opacity: .15; }
+        .brand-icon { animation: none; }
+      }
+
       /* Painel de operação: hierarquia mais clara sem cobrir o globo. */
       #globe, #map { z-index: 0; }
       #globe::after {
@@ -613,6 +756,14 @@
       <div class="fallback-orb" aria-hidden="true"></div>
       <div class="fallback-message"><strong>Globo 3D indisponível</strong>Confira a conexão e o suporte a WebGL do navegador e recarregue a página.</div>
     </div>
+    <div class="tactical-overlay" aria-hidden="true">
+      <span class="tactical-corner tl"></span>
+      <span class="tactical-corner tr"></span>
+      <span class="tactical-corner bl"></span>
+      <span class="tactical-corner br"></span>
+      <div class="tactical-reticle"></div>
+      <span class="tactical-caption">GEOINT · VISUALIZAÇÃO EXPERIMENTAL</span>
+    </div>
     <div class="hud">
       <div class="topbar">
         <div class="brand">
@@ -620,6 +771,7 @@
           <div>
             <strong>Sentinel Atlas</strong>
             <span>GeoInt & Geofencing Platform · v0.2</span>
+            <small>COMMAND CENTER / ATLAS</small>
           </div>
         </div>
         <div class="tools">
@@ -628,6 +780,7 @@
             <span id="search-feedback" aria-live="polite">TODOS</span>
           </div>
           <div id="api-status" class="panel status" role="status" aria-live="polite">DEMONSTRAÇÃO · dados simulados</div>
+          <button id="focus-mode" aria-pressed="false" title="Ocultar painéis para ampliar a visualização do globo">◫ Tela limpa</button>
         </div>
       </div>
 
@@ -720,6 +873,23 @@
     </div>
     <div id="map" aria-label="Mapa Google com imagens de satélite e trânsito"></div>
     <script>
+      // Modo de visualização imersiva: mantém a saída acessível pelo botão superior.
+      const focusModeButton = document.getElementById('focus-mode');
+      function setFocusMode(enabled) {
+        document.body.classList.toggle('focus-mode', enabled);
+        focusModeButton.setAttribute('aria-pressed', String(enabled));
+        focusModeButton.textContent = enabled ? '▦ Mostrar painel' : '◫ Tela limpa';
+        focusModeButton.title = enabled ? 'Restaurar painéis e ferramentas' : 'Ocultar painéis para ampliar a visualização';
+      }
+      focusModeButton.addEventListener('click', () => {
+        setFocusMode(!document.body.classList.contains('focus-mode'));
+      });
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && document.body.classList.contains('focus-mode')) {
+          setFocusMode(false);
+        }
+      });
+
       // No celular, o resumo começa recolhido para preservar espaço para o mapa.
       const overviewPanel = document.getElementById('overview-panel');
       const compactLayout = window.matchMedia('(max-width: 900px)');

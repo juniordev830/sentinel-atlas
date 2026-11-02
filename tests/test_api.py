@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 import backend.app as app_module
-from backend.app import app
+from backend.app import PositionInput, app
 
 client = TestClient(app)
 
@@ -133,3 +133,15 @@ def test_websocket_rejects_oversized_message(monkeypatch):
         with pytest.raises(WebSocketDisconnect) as error:
             websocket.receive_text()
         assert error.value.code == 1009
+
+
+
+@pytest.mark.parametrize("timestamp", [-1, float("nan"), float("inf"), float("-inf")])
+def test_position_input_rejects_invalid_timestamps(timestamp):
+    with pytest.raises(ValueError):
+        PositionInput(latitude=0, longitude=0, timestamp=timestamp)
+
+
+def test_position_input_preserves_zero_timestamp():
+    position = PositionInput(latitude=0, longitude=0, timestamp=0)
+    assert position.timestamp == 0

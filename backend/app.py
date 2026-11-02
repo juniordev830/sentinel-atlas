@@ -9,6 +9,7 @@ import sys
 import time
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Query
 from fastapi.responses import JSONResponse
@@ -53,7 +54,6 @@ class PositionInput(BaseModel):
     timestamp: float | None = None
 
 
-from typing import Any  # noqa: E402
 
 app = FastAPI(title="Sentinel Atlas GPS API", version="0.1.0")
 settings = Settings.from_environment()

@@ -55,6 +55,32 @@ jobs:
           PY
           node --check /tmp/sentinel-inline.js
 
+      - name: Validate safe local-only Docker Compose contract
+        env:
+          SENTINEL_API_TOKEN: ci-test-token-not-real-012345678901234567890
+        run: |
+          docker compose config --quiet
+          docker compose config --format json > /tmp/atlas-compose-config.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          compose = json.loads(Path("/tmp/atlas-compose-config.json").read_text())
+          service = compose["services"]["atlas"]
+          assert service["environment"]["SENTINEL_ENV"] == "production"
+          assert len(service["environment"]["SENTINEL_API_TOKEN"]) >= 32
+          assert service["ports"] == [{
+              "mode": "ingress", "target": 8000,
+              "published": "8000", "protocol": "tcp", "host_ip": "127.0.0.1"
+          }], service["ports"]
+          assert "ALL" in service["cap_drop"]
+          assert "no-new-privileges:true" in service["security_opt"]
+          dockerfile = Path("Dockerfile").read_text()
+          ignore = Path(".dockerignore").read_text().splitlines()
+          assert "ENV SENTINEL_ENV=production" in dockerfile
+          assert "USER atlas" in dockerfile
+          assert ".env" in ignore and ".env.*" in ignore and ".data" in ignore
+          PY
+
       - name: Validate Python syntax
         run: |
           python -m py_compile backend/app.py python/gps_core.py python/settings.py

@@ -1,0 +1,21 @@
+# Local secrets and runtime data must never enter image build context.
+.git
+.github
+.env
+.env.*
+!.env.example
+.data
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.sqlite
+*.sqlite3
+*.db
+node_modules
+dist
+build
+.coverage
+.pytest_cache
+*.log

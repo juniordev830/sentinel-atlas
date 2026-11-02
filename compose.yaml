@@ -1,0 +1,23 @@
+# Local-only development/demo container with production authentication enabled.
+# A 32+ character token is required; never commit its value.
+services:
+  atlas:
+    build:
+      context: .
+    environment:
+      SENTINEL_ENV: production
+      SENTINEL_API_TOKEN: ${SENTINEL_API_TOKEN:?Set a strong SENTINEL_API_TOKEN of at least 32 characters}
+      SENTINEL_DB_PATH: /app/.data/sentinel.sqlite3
+      PYTHONDONTWRITEBYTECODE: "1"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - atlas-data:/app/.data
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  atlas-data:

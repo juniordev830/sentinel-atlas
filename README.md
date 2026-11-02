@@ -21,6 +21,8 @@ O **Sentinel Atlas** reúne um núcleo de geolocalização em Python, uma API as
 
 No painel do **God's Eye View**, a área **Camadas** filtra os tipos de objetos e a área **Ferramentas** oferece controles do globo.
 
+- **◫ Tela limpa / ▦ Mostrar painel:** ativa uma apresentação imersiva que esconde os painéis auxiliares sem bloquear o globo; o botão no topo ou a tecla `Esc` restauram os controles.
+- **Visual tático:** uma moldura de comando com retículo, grade discreta e varredura visual opcional. Esses elementos são apenas decorativos, não indicam detecção de eventos e não interceptam cliques. A moldura desaparece no mapa 2D ou se o WebGL estiver indisponível.
 - **⏸️ Pausar giro / ▶️ Retomar giro:** liga ou desliga a rotação automática; a rotação também é suspensa quando a aba fica oculta ou o usuário abre o mapa 2D. A preferência de acessibilidade por movimento reduzido é respeitada inicialmente e quando alterada.
 - **🎯 Visão global:** fecha o inspetor, retorna do mapa 2D (se necessário) e recentraliza a câmera do globo.
 - **Busca de objetos:** digite nomes ou identificadores; a busca considera a camada selecionada e continua aplicada quando a fonte de dados atualiza. Pressione `/` para focar a busca e `Esc` para limpá-la.

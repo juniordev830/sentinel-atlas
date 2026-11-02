@@ -1226,8 +1226,11 @@
         }
       }
 
-      // Nuvens independentes em uma esfera sutilmente elevada.
-      if (window.THREE) {
+      // Nuvens independentes carregadas sob demanda (evita gastar dados no modo Econômico).
+      let cloudsRequested = false;
+      function loadClouds() {
+        if (!window.THREE || cloudsRequested) return;
+        cloudsRequested = true;
         new THREE.TextureLoader().load(
           'https://raw.githubusercontent.com/vasturiano/globe.gl/master/example/clouds/clouds.png',
           cloudsTexture => {
@@ -1295,6 +1298,7 @@
           globeMaterial.bumpScale = profile.bump;
           globeMaterial.needsUpdate = true;
         }
+        if (profile.clouds) loadClouds();
         if (cloudsMesh) {
           cloudsMesh.visible = profile.clouds;
           cloudsMesh.material.opacity = profile.opacity;

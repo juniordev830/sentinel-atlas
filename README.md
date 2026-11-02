@@ -12,7 +12,7 @@ O **Sentinel Atlas** reúne um núcleo de geolocalização em Python, uma API as
 
 - **Geofencing:** cálculo de distância e detecção de entrada/saída de áreas configuradas.
 - **API:** endpoints HTTP com FastAPI e canal WebSocket para posições.
-- **Persistência local:** armazenamento SQLite para geofences e histórico GPS limitado às 10.000 posições recebidas mais recentemente. Registros antigos excedentes são removidos também ao abrir um banco existente; esse limite não substitui uma política completa de retenção e privacidade.
+- **Persistência local:** SQLite para geofences e posições GPS. A retenção limitada é **opt-in**; o sistema nunca exclui posições antigas apenas por inicializar ou atualizar o servidor.
 - **Painel 3D:** interface web com camadas, filtros e rotas demonstrativas.
 - **Fontes externas:** integrações opcionais com serviços públicos e provedores que exigem credenciais.
 - **Execução reproduzível:** suporte a Docker e verificações automatizadas via GitHub Actions.
@@ -146,6 +146,24 @@ Se algum comando falhar, confira as dependências instaladas e a configuração 
 - Nunca versione arquivos `.env`, tokens, chaves ou dados pessoais.
 - Proteja a API com autenticação e controles de acesso adequados antes de expô-la à internet.
 - Restrinja chaves de provedores por domínio e permissões sempre que o serviço oferecer essa opção.
+
+## Retenção de posições GPS (opt-in, com backup obrigatório)
+
+Por padrão, **não há exclusão automática** de posições armazenadas. Para limitar
+o histórico, configure a variável de ambiente
+`SENTINEL_POSITION_RETENTION_LIMIT=10000` (inteiro de 1 a 1.000.000)
+**antes de iniciar o processo**. Use uma variável do sistema ou configuração
+do contêiner; não publique tokens ou dados GPS no Git.
+
+**Atenção:** esta opção exclui permanentemente posições antigas **depois da
+próxima gravação de GPS**, conservando os registros mais recentes na quantidade
+configurada. O simples início do servidor não exclui nada. Faça um backup
+verificado do banco SQLite, inclusive dos volumes Docker, antes de habilitar
+a retenção. Sem um backup, não há como recuperar as posições descartadas.
+
+O Compose fornecido não define o limite de retenção e, portanto, preserva
+os dados existentes por padrão. O histórico de posições é sensível; uma
+retenção por quantidade não substitui política de privacidade por período.
 
 ## Próximos passos sugeridos
 

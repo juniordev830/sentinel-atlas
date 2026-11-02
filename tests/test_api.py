@@ -260,3 +260,18 @@ def test_browser_session_rejects_expired_or_forged_cookie(monkeypatch, cookie_va
     response = client.get("/api/geofences")
     assert response.status_code == 401
     client.cookies.clear()
+
+
+def test_browser_login_rejects_unicode_token_without_server_error(monkeypatch):
+    _configure_browser_auth(monkeypatch)
+    response = client.post(
+        "/api/session", json={"token": "inválido"},
+        headers={"Origin": "http://testserver"},
+    )
+    assert response.status_code == 401
+
+
+def test_session_signature_rejects_unicode_without_server_error(monkeypatch):
+    _configure_browser_auth(monkeypatch)
+    expiry = int(app_module.time.time()) + 3600
+    assert app_module._valid_session_cookie(f"{expiry}.assinátura") is False

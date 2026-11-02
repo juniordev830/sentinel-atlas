@@ -140,7 +140,7 @@ def _valid_session_cookie(value: str | None) -> bool:
     if expires_at <= int(time.time()):
         return False
     expected_signature = _session_signature(expires_at)
-    return hmac.compare_digest(supplied_signature, expected_signature)
+    return hmac.compare_digest(supplied_signature.encode("utf-8"), expected_signature.encode("utf-8"))
 
 
 def _is_same_origin(origin: str | None, host: str | None, scheme: str) -> bool:
@@ -160,7 +160,7 @@ async def optional_token_auth(request: Request, call_next):
     public_paths = {"/api/health", "/api/public-config", "/api/session", "/api/session/logout"}
     authorization = request.headers.get("authorization", "")
     bearer_valid = bool(settings.api_token) and hmac.compare_digest(
-        authorization, f"Bearer {settings.api_token}"
+        authorization.encode("utf-8"), f"Bearer {settings.api_token}".encode("utf-8")
     )
     session_valid = _valid_session_cookie(request.cookies.get(SESSION_COOKIE_NAME))
 
@@ -259,7 +259,7 @@ def create_browser_session(payload: SessionLoginInput, request: Request, respons
         raise HTTPException(status_code=503, detail="Autenticação da API não configurada")
     if not _is_same_origin(request.headers.get("origin"), request.headers.get("host"), request.url.scheme):
         raise HTTPException(status_code=403, detail="Origem da requisição inválida")
-    if not hmac.compare_digest(payload.token, settings.api_token):
+    if not hmac.compare_digest(payload.token.encode("utf-8"), settings.api_token.encode("utf-8")):
         raise HTTPException(status_code=401, detail="Token inválido")
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
@@ -496,7 +496,7 @@ async def positions(websocket: WebSocket) -> None:
 
     authorization = websocket.headers.get("authorization", "")
     bearer_valid = bool(settings.api_token) and hmac.compare_digest(
-        authorization, f"Bearer {settings.api_token}"
+        authorization.encode("utf-8"), f"Bearer {settings.api_token}".encode("utf-8")
     )
     session_valid = _valid_session_cookie(websocket.cookies.get(SESSION_COOKIE_NAME))
     if settings.api_token and not (bearer_valid or session_valid):

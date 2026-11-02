@@ -1171,11 +1171,14 @@
         }
 
         const matchingAssets = assets.filter(asset =>
-          asset.label.toLocaleLowerCase('pt-BR').includes(query) ||
-          asset.type.toLocaleLowerCase('pt-BR').includes(query) ||
-          asset.id.toLocaleLowerCase('pt-BR').includes(query)
+          (activeLayer === 'all' || asset.type === activeLayer) &&
+          (asset.label.toLocaleLowerCase('pt-BR').includes(query) ||
+           asset.type.toLocaleLowerCase('pt-BR').includes(query) ||
+           asset.id.toLocaleLowerCase('pt-BR').includes(query))
         );
-        const matchingFences = loadedGeofences
+        const visibleFences = activeLayer === 'all' || activeLayer === 'geofence'
+          ? loadedGeofences : [];
+        const matchingFences = visibleFences
           .filter(fence => fence.name.toLocaleLowerCase('pt-BR').includes(query))
           .map(fence => ({
             id: `gf-${fence.name}`, type: 'geofence',

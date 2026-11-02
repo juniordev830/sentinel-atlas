@@ -312,3 +312,46 @@ test('pesquisa textual respeita a camada visual selecionada', () => {
   assert.equal(rendered[0][0].type, 'aircraft');
   assert.match(feedback.textContent, /1 RESULTADO/);
 });
+
+test('modo cinematográfico exibe e oculta controles sem impedir a saída', () => {
+  const classes = classList();
+  const handlers = {};
+  const focusButton = {
+    attrs: {},
+    setAttribute(name, value) { this.attrs[name] = value; },
+    addEventListener(name, handler) { this[name] = handler; }
+  };
+  const document = {
+    body: { classList: classes },
+    getElementById(id) {
+      assert.equal(id, 'focus-mode');
+      return focusButton;
+    },
+    addEventListener(name, handler) { handlers[name] = handler; }
+  };
+  const context = { document };
+  vm.runInNewContext(
+    snippet("const focusModeButton = document.getElementById('focus-mode');",
+      '// No celular, o resumo começa recolhido para preservar espaço para o mapa.'),
+    context
+  );
+  assert.equal(focusButton.attrs['aria-pressed'], undefined);
+  focusButton.click();
+  assert.equal(classes.contains('focus-mode'), true);
+  assert.equal(focusButton.attrs['aria-pressed'], 'true');
+  assert.match(focusButton.textContent, /Mostrar painel/);
+  handlers.keydown({ key: 'Escape' });
+  assert.equal(classes.contains('focus-mode'), false);
+  assert.equal(focusButton.attrs['aria-pressed'], 'false');
+  focusButton.click();
+  focusButton.click();
+  assert.equal(classes.contains('focus-mode'), false);
+});
+
+test('camada tática é decorativa e não intercepta cliques no globo', () => {
+  assert.match(html, /<div class="tactical-overlay" aria-hidden="true">/);
+  assert.match(html, /\.tactical-overlay\s*\{[^}]*pointer-events:\s*none/s);
+  assert.match(html, /body\.map-mode \.tactical-overlay\s*\{\s*display:\s*none;/);
+  assert.match(html, /id="focus-mode" aria-pressed="false"/);
+  assert.match(html, /@media \(prefers-reduced-motion: reduce\)/);
+});

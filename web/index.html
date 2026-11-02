@@ -1266,14 +1266,16 @@
       const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
       const renderQualityControl = document.getElementById('render-quality');
 
-      function getRenderProfile(requested, devicePixelRatio = 1, compact = false, reducedMotion = false) {
+      function getRenderProfile(requested, devicePixelRatio = 1, compact = false, reducedMotion = false, memoryGb = 4, cpuCores = 4) {
         const modes = {
           ultra: { dpr: 2, curvature: 1.5, points: 18, arcSegments: 96, arcRadial: 10, atmosphere: .19, bump: 2.5, clouds: true, opacity: .30 },
           balanced: { dpr: 1.5, curvature: 3, points: 12, arcSegments: 64, arcRadial: 6, atmosphere: .17, bump: 1.8, clouds: true, opacity: .24 },
           eco: { dpr: 1, curvature: 6, points: 6, arcSegments: 30, arcRadial: 4, atmosphere: .12, bump: .75, clouds: false, opacity: 0 }
         };
+        const powerfulDesktop = !compact && !reducedMotion &&
+          Number(memoryGb) >= 8 && Number(cpuCores) >= 8;
         const resolved = requested === 'auto'
-          ? (compact || reducedMotion ? 'eco' : 'balanced')
+          ? (compact || reducedMotion ? 'eco' : (powerfulDesktop ? 'ultra' : 'balanced'))
           : (Object.hasOwn(modes, requested) ? requested : 'balanced');
         const profile = modes[resolved];
         return { ...profile, mode: resolved, pixelRatio: Math.min(Math.max(Number(devicePixelRatio) || 1, 1), profile.dpr) };
@@ -1284,7 +1286,9 @@
           renderQualityControl.value,
           window.devicePixelRatio || 1,
           window.matchMedia('(max-width: 768px)').matches,
-          motionPreference.matches
+          motionPreference.matches,
+          navigator.deviceMemory ?? 4,
+          navigator.hardwareConcurrency ?? 4
         );
         // Os métodos são opcionais para manter compatibilidade com versões antigas da biblioteca.
         const renderer = globe.renderer?.();

@@ -50,7 +50,7 @@ class GeofenceInput(BaseModel):
 class PositionInput(BaseModel):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
-    timestamp: float | None = None
+    timestamp: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
 
 from typing import Any  # noqa: E402
@@ -308,7 +308,7 @@ async def positions(websocket: WebSocket) -> None:
                 await websocket.close(code=1009, reason="Mensagem excede o limite de 16 KiB")
                 return
             payload = PositionInput.model_validate_json(message)
-            position = Position(payload.latitude, payload.longitude, payload.timestamp or time.time())
+            position = Position(payload.latitude, payload.longitude, payload.timestamp if payload.timestamp is not None else time.time())
             store.save_position(position)
             events = []
             for fence, engine in geofences.values():

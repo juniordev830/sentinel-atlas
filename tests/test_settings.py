@@ -21,11 +21,6 @@ class SettingsTests(unittest.TestCase):
         self.assertNotIn("Google Maps", names)
         self.assertNotIn("AISStream vessels", names)
 
-
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_production_requires_long_api_token(self):
         with patch.dict(os.environ, {
             "SENTINEL_ENV": "production",
@@ -43,3 +38,7 @@ if __name__ == "__main__":
             settings = Settings.from_environment()
         self.assertEqual(settings.environment, "production")
         self.assertEqual(settings.api_token, token)
+
+
+if __name__ == "__main__":
+    unittest.main()

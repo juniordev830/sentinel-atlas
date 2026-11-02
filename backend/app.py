@@ -7,11 +7,12 @@ import hmac
 import os
 import sys
 import time
+from urllib.parse import urlsplit
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Query
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Query, Response
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -53,6 +54,10 @@ class PositionInput(BaseModel):
     timestamp: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
 
+class SessionLoginInput(BaseModel):
+    token: str = Field(min_length=1, max_length=512)
+
+
 from typing import Any  # noqa: E402
 
 app = FastAPI(title="Sentinel Atlas GPS API", version="0.1.0")
@@ -64,12 +69,61 @@ for saved_fence in store.list():
     geofences[saved_fence.name] = (saved_fence, AutomationEngine(saved_fence))
 
 
+SESSION_COOKIE_NAME = "sentinel_session"
+SESSION_TTL_SECONDS = 60 * 60
+
+
+def _session_signature(expires_at: int) -> str:
+    if not settings.api_token:
+        return ""
+    message = f"sentinel-browser-session:{expires_at}".encode("utf-8")
+    return hmac.new(settings.api_token.encode("utf-8"), message, "sha256").hexdigest()
+
+
+def _create_session_cookie() -> str:
+    expires_at = int(time.time()) + SESSION_TTL_SECONDS
+    return f"{expires_at}.{_session_signature(expires_at)}"
+
+
+def _valid_session_cookie(value: str | None) -> bool:
+    if not value or not settings.api_token:
+        return False
+    try:
+        expires_text, supplied_signature = value.split(".", 1)
+        expires_at = int(expires_text)
+    except (ValueError, TypeError):
+        return False
+    if expires_at <= int(time.time()):
+        return False
+    expected_signature = _session_signature(expires_at)
+    return hmac.compare_digest(supplied_signature, expected_signature)
+
+
+def _is_same_origin(origin: str | None, host: str | None, scheme: str) -> bool:
+    if not origin or not host:
+        return False
+    try:
+        parsed = urlsplit(origin)
+    except ValueError:
+        return False
+    expected_scheme = "https" if scheme in {"https", "wss"} else "http"
+    return parsed.scheme == expected_scheme and parsed.netloc.lower() == host.lower()
+
+
 @app.middleware("http")
 async def optional_token_auth(request: Request, call_next):
-    protected_path = (
-        request.url.path.startswith("/api/")
-        and request.url.path not in {"/api/health", "/api/public-config"}
+    path = request.url.path
+    public_paths = {"/api/health", "/api/public-config", "/api/session", "/api/session/logout"}
+    authorization = request.headers.get("authorization", "")
+    bearer_valid = bool(settings.api_token) and hmac.compare_digest(
+        authorization, f"Bearer {settings.api_token}"
     )
+    session_valid = _valid_session_cookie(request.cookies.get(SESSION_COOKIE_NAME))
+
+    if path == "/" and settings.api_token and not (bearer_valid or session_valid):
+        return RedirectResponse(url="/login", status_code=303)
+
+    protected_path = path.startswith("/api/") and path not in public_paths
     if protected_path:
         if not settings.api_token:
             if settings.environment == "production":
@@ -77,12 +131,114 @@ async def optional_token_auth(request: Request, call_next):
                     status_code=503,
                     content={"detail": "Autenticação da API não configurada"},
                 )
-        else:
-            authorization = request.headers.get("authorization", "")
-            expected = f"Bearer {settings.api_token}"
-            if not hmac.compare_digest(authorization, expected):
-                return JSONResponse(status_code=401, content={"detail": "Token de API inválido"})
+        elif not (bearer_valid or session_valid):
+            return JSONResponse(status_code=401, content={"detail": "Autenticação necessária"})
+        elif session_valid and not bearer_valid and request.method not in {"GET", "HEAD", "OPTIONS"}:
+            if not _is_same_origin(
+                request.headers.get("origin"),
+                request.headers.get("host"),
+                request.url.scheme,
+            ):
+                return JSONResponse(status_code=403, content={"detail": "Origem da requisição inválida"})
+
     return await call_next(request)
+
+
+@app.get("/login", response_class=HTMLResponse)
+def browser_login_page() -> str:
+    """Página mínima para trocar o token administrativo por um cookie de sessão."""
+    return """<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#070b16">
+  <title>Entrar · Sentinel Atlas</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#050811;color:#e2e8f0;font:16px system-ui,sans-serif}
+    main{width:min(92vw,420px);padding:32px;border:1px solid #164e63;border-radius:18px;background:#0b1221;box-shadow:0 20px 70px #0008}
+    h1{margin:0 0 8px;color:#67e8f9;font-size:1.45rem}p{color:#94a3b8;line-height:1.5}
+    label{display:block;margin:22px 0 8px}input{width:100%;padding:13px;border:1px solid #334155;border-radius:9px;background:#020617;color:#fff;font:inherit}
+    button{width:100%;margin-top:14px;padding:13px;border:0;border-radius:9px;background:#0891b2;color:white;font-weight:700;font:inherit;cursor:pointer}
+    #status{min-height:24px;margin-top:14px;color:#fca5a5;font-size:.9rem}small{color:#64748b}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Sentinel Atlas</h1>
+    <p>Entre com o token administrativo configurado no servidor. Ele será trocado por uma sessão temporária protegida por cookie HttpOnly.</p>
+    <form id="login-form">
+      <label for="token">Token de acesso</label>
+      <input id="token" name="token" type="password" autocomplete="current-password" required maxlength="512">
+      <button type="submit">Entrar no painel</button>
+    </form>
+    <button id="logout" type="button" style="background:#334155">Encerrar sessão neste navegador</button>
+    <div id="status" role="status" aria-live="polite"></div>
+    <small>A sessão expira automaticamente após 1 hora. Não compartilhe seu token.</small>
+  </main>
+  <script>
+    const status = document.getElementById('status');
+    document.getElementById('login-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const tokenInput = document.getElementById('token');
+      status.textContent = 'Validando acesso…';
+      try {
+        const response = await fetch('/api/session', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({token: tokenInput.value})
+        });
+        if (!response.ok) throw new Error(response.status === 401 ? 'Token inválido.' : 'Não foi possível iniciar a sessão.');
+        tokenInput.value = '';
+        location.replace('/');
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    });
+    document.getElementById('logout').addEventListener('click', async () => {
+      try {
+        await fetch('/api/session/logout', {method:'POST', credentials:'same-origin'});
+        status.textContent = 'Sessão encerrada.';
+      } catch {
+        status.textContent = 'Não foi possível encerrar a sessão.';
+      }
+    });
+  </script>
+</body>
+</html>"""
+
+
+@app.post("/api/session")
+def create_browser_session(payload: SessionLoginInput, request: Request, response: Response) -> dict[str, object]:
+    if not settings.api_token:
+        raise HTTPException(status_code=503, detail="Autenticação da API não configurada")
+    if not _is_same_origin(request.headers.get("origin"), request.headers.get("host"), request.url.scheme):
+        raise HTTPException(status_code=403, detail="Origem da requisição inválida")
+    if not hmac.compare_digest(payload.token, settings.api_token):
+        raise HTTPException(status_code=401, detail="Token inválido")
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=_create_session_cookie(),
+        max_age=SESSION_TTL_SECONDS,
+        httponly=True,
+        secure=settings.environment == "production",
+        samesite="strict",
+        path="/",
+    )
+    return {"authenticated": True, "expires_in": SESSION_TTL_SECONDS}
+
+
+@app.post("/api/session/logout")
+def end_browser_session(response: Response) -> dict[str, bool]:
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path="/",
+        httponly=True,
+        secure=settings.environment == "production",
+        samesite="strict",
+    )
+    return {"authenticated": False}
 
 
 @app.get("/api/health")
@@ -295,10 +451,19 @@ async def positions(websocket: WebSocket) -> None:
         return
 
     authorization = websocket.headers.get("authorization", "")
-    expected = f"Bearer {settings.api_token}"
-    if settings.api_token and not hmac.compare_digest(authorization, expected):
-        await websocket.close(code=1008, reason="Token de API inválido")
+    bearer_valid = bool(settings.api_token) and hmac.compare_digest(
+        authorization, f"Bearer {settings.api_token}"
+    )
+    session_valid = _valid_session_cookie(websocket.cookies.get(SESSION_COOKIE_NAME))
+    if settings.api_token and not (bearer_valid or session_valid):
+        await websocket.close(code=1008, reason="Autenticação necessária")
         return
+    if session_valid and not bearer_valid:
+        host = websocket.headers.get("host")
+        origin = websocket.headers.get("origin")
+        if not _is_same_origin(origin, host, websocket.url.scheme):
+            await websocket.close(code=1008, reason="Origem da conexão inválida")
+            return
 
     await websocket.accept()
     try:

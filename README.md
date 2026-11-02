@@ -28,7 +28,7 @@ O **Sentinel Atlas** reúne um núcleo de geolocalização em Python, uma API as
 | `typescript/gps_client.ts` | Cliente TypeScript para envio de posições |
 | `web/index.html` | Painel web 3D e controles de visualização |
 | `tests/test_gps.py` | Testes do núcleo geográfico e das transições de geofence |
-| `Dockerfile`, `docker-compose.yml` | Empacotamento e execução local |
+| `Dockerfile`, `compose.yaml`, `.dockerignore` | Contêiner local com autenticação obrigatória e segredos excluídos do build |
 | `.github/workflows/ci.yml` | Verificações automatizadas |
 
 ## Requisitos
@@ -83,11 +83,42 @@ Verifique a API com:
 curl http://localhost:8000/api/health
 ```
 
-### Alternativa: Docker
+### Alternativa: Docker Compose (seguro por padrão)
+
+O `compose.yaml` agora existe no repositório. Antes de iniciar, configure
+um token **aleatório com pelo menos 32 caracteres**, somente no seu ambiente:
+
+Linux/macOS:
 
 ```bash
+export SENTINEL_API_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 docker compose up --build
 ```
+
+Windows PowerShell:
+
+```powershell
+$env:SENTINEL_API_TOKEN = python -c "import secrets; print(secrets.token_urlsafe(48))"
+docker compose up --build
+```
+
+- Acesse **somente no próprio computador**: `http://127.0.0.1:8000/login`.
+  Informe o token gerado na tela de login; não o salve no código ou no Git.
+- O Compose exige `SENTINEL_ENV=production` e recusa iniciar sem a variável
+  `SENTINEL_API_TOKEN`. Mesmo com token definido, o servidor rejeita
+  senhas curtas na inicialização.
+- O mapeamento de porta é `127.0.0.1:8000:8000` (não acessível pela rede
+  local). A escuta em `0.0.0.0` no Dockerfile é **somente dentro do contêiner**.
+- O SQLite fica em um volume Docker chamado `atlas-data`, mantido entre
+  reinicializações. `docker compose down -v` **apaga esse volume e os dados**;
+  não use `-v` sem intenção de excluir o histórico.
+- O `.dockerignore` exclui `.env`, bancos locais, caches e arquivos de Git
+  do contexto da imagem. O processo roda como usuário não privilegiado.
+- Para acesso remoto, configure HTTPS, autenticação e um proxy seguro:
+  **não altere o binding para `0.0.0.0` sem revisar a exposição de GPS,
+  controles de acesso, limites de tentativas e isolamento por usuário**.
+
+Para interromper sem apagar os dados, rode `docker compose down`.
 
 ## Executar o núcleo de geofencing
 
@@ -144,7 +175,7 @@ Se algum comando falhar, confira as dependências instaladas e a configuração 
 - Coordenadas GPS podem revelar a localização de uma pessoa. Use dados simulados durante desenvolvimento e testes.
 - Não registre nem publique coordenadas reais sem necessidade e autorização.
 - Nunca versione arquivos `.env`, tokens, chaves ou dados pessoais.
-- Proteja a API com autenticação e controles de acesso adequados antes de expô-la à internet.
+- Proteja a API com autenticação e controles de acesso adequados antes de expô-la à internet. O Compose padrão não publica portas fora do host local e exige token forte.
 - Restrinja chaves de provedores por domínio e permissões sempre que o serviço oferecer essa opção.
 
 ## Próximos passos sugeridos

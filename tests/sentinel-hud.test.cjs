@@ -392,6 +392,8 @@ test('painel oferece qualidade selecionável e modo terrestre diurno por padrão
 test('perfil reduz nuvens e densidade geométrica sem remover interações de clique', () => {
   const htmlQuality = snippet('function applyRenderQuality()', "renderQualityControl.addEventListener('change', applyRenderQuality);");
   assert.match(htmlQuality, /cloudsMesh\.visible = profile\.clouds/);
+  assert.match(html, /function loadClouds\(\)/);
+  assert.match(htmlQuality, /if \(profile\.clouds\) loadClouds\(\)/);
   assert.match(htmlQuality, /globe\.pointResolution\?\.\(profile\.points\)/);
   assert.match(htmlQuality, /globe\.globeCurvatureResolution\?\.\(profile\.curvature\)/);
   assert.doesNotMatch(htmlQuality, /enablePointerInteraction\(false\)/);

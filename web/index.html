@@ -748,6 +748,53 @@
         .hud { grid-template-rows: auto minmax(0, 1fr) auto; }
         .bottombar { grid-row: 3; }
       }
+
+      /* A camada decorativa fica oculta quando a visualização 3D falha. */
+      #globe-fallback:not([hidden]) ~ .tactical-overlay { display: none; }
+
+      /* Evita sobreposição da pesquisa, do status e do modo foco no celular. */
+      @media (max-width: 768px) {
+        .topbar .tools {
+          flex-wrap: wrap;
+          gap: 6px;
+          justify-content: stretch;
+        }
+        .topbar .search-wrap {
+          flex: 1 0 100%;
+          min-width: 0;
+        }
+        .topbar #api-status {
+          flex: 1 1 130px;
+          max-width: calc(100% - 128px);
+          min-width: 0;
+          justify-content: flex-start;
+        }
+        .topbar #focus-mode {
+          flex: 0 0 auto;
+          min-height: 44px;
+        }
+        body.focus-mode .topbar {
+          flex-direction: row;
+          gap: 8px;
+          align-items: flex-start;
+        }
+        body.focus-mode .brand {
+          flex: 1 1 auto;
+          min-width: 0;
+          padding: 10px;
+        }
+        body.focus-mode .brand strong {
+          font-size: 11px;
+          letter-spacing: .08em;
+        }
+        body.focus-mode .brand span,
+        body.focus-mode .brand small { display: none; }
+        body.focus-mode .topbar .tools {
+          width: auto;
+          flex: 0 0 auto;
+          flex-wrap: nowrap;
+        }
+      }
     </style>
   </head>
   <body>

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "project_kind": "Painel geoespacial FastAPI / WebSocket / JavaScript",
+  "entry_points": [
+    "backend/app.py",
+    "python/settings.py",
+    "web/index.html"
+  ],
+  "test_commands": [
+    "python -m pytest tests -q"
+  ],
+  "review_focus": [
+    "Autenticação de HTTP e WebSocket",
+    "Retenção de posições e isolamento de dados",
+    "Limites para fontes externas"
+  ]
+}

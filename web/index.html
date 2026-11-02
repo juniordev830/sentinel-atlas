@@ -464,8 +464,9 @@
       }
       #globe-fallback[hidden] { display: none; }
       #globe-fallback {
-        position: absolute;
+        position: fixed;
         inset: 0;
+        z-index: 1;
         display: grid;
         place-content: center;
         justify-items: center;
@@ -602,11 +603,10 @@
     </style>
   </head>
   <body>
-    <div id="globe" aria-label="Globo 3D com dados simulados de localização">
-      <div id="globe-fallback" hidden role="status">
-        <div class="fallback-orb" aria-hidden="true"></div>
-        <div class="fallback-message"><strong>Globo 3D indisponível</strong>Não foi possível carregar a visualização interativa. Verifique a conexão e recarregue a página.</div>
-      </div>
+    <div id="globe" aria-label="Globo 3D com dados simulados de localização"></div>
+    <div id="globe-fallback" hidden role="status">
+      <div class="fallback-orb" aria-hidden="true"></div>
+      <div class="fallback-message"><strong>Globo 3D indisponível</strong>Não foi possível carregar a visualização interativa. Verifique a conexão e recarregue a página.</div>
     </div>
     <div class="hud">
       <div class="topbar">
@@ -713,13 +713,13 @@
     </div>
     <div id="map" aria-label="Mapa Google com imagens de satélite e trânsito"></div>
     <script>
-      function initializeSentinel() {
       // No celular, o resumo começa recolhido para preservar espaço para o mapa.
       const overviewPanel = document.getElementById('overview-panel');
       const compactLayout = window.matchMedia('(max-width: 900px)');
       overviewPanel.open = !compactLayout.matches;
       compactLayout.addEventListener?.('change', event => { overviewPanel.open = !event.matches; });
 
+      function initializeSentinel() {
       const assets = [
         { id:'flight-1', type:'aircraft', label:'JJ 3812 · São Paulo', lat:-23.55, lng:-46.63, color:'#38bdf8', altitude:0.04 },
         { id:'flight-2', type:'aircraft', label:'AD 4520 · Recife', lat:-8.05, lng:-34.9, color:'#38bdf8', altitude:0.04 },

@@ -139,3 +139,31 @@ test('informa indisponibilidade quando a biblioteca gráfica não carrega', () =
   timeout();
   assert.equal(fallbacks, 1);
 });
+
+test('mantém o aviso e desativa os controles quando o WebGL falha', () => {
+  // O construtor do globo pode substituir todos os filhos do seu recipiente.
+  assert.match(html, /<div id="globe"[^>]*><\/div>\s*<div id="globe-fallback"/);
+  const fallback = { hidden: true };
+  const overview = { textContent: '' };
+  const status = { textContent: '' };
+  const controls = [{ disabled: false }, { disabled: false }];
+  const elements = { 'globe-fallback': fallback, 'overview-globe': overview, 'api-status': status };
+  const context = {
+    document: {
+      querySelector: () => null,
+      querySelectorAll: () => controls,
+      getElementById: id => elements[id]
+    },
+    Globe: () => {},
+    initializeSentinel() { throw new Error('WebGL indisponível'); },
+    setTimeout() { throw new Error('não deve agendar'); },
+    clearTimeout() {},
+    console: { error() {} }
+  };
+  const code = snippet('function setGlobeControlsEnabled(enabled)', 'bootSentinel();');
+  vm.runInNewContext(code + '\nbootSentinel();', context);
+  assert.equal(fallback.hidden, false);
+  assert.equal(overview.textContent, 'INDISPONÍVEL');
+  assert.match(status.textContent, /GLOBO 3D INDISPONÍVEL/);
+  assert.ok(controls.every(control => control.disabled));
+});

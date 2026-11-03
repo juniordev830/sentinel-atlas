@@ -401,3 +401,75 @@ test('perfil reduz nuvens e densidade geométrica sem remover interações de cl
   assert.match(htmlQuality, /globe\.globeCurvatureResolution\?\.\(profile\.curvature\)/);
   assert.doesNotMatch(htmlQuality, /enablePointerInteraction\(false\)/);
 });
+
+test('Google Places só aceita categorias oficiais e limita área consultada', () => {
+  const context = {};
+  vm.runInNewContext(
+    snippet('const googlePlacesTypes = new Set(', 'function googleMapsLink(uri)'),
+    context
+  );
+  const request = context.buildNearbySearchRequest('hospital', {lat: -5.79, lng: -35.21}, 90000);
+  assert.equal(request.locationRestriction.radius, 5000);
+  assert.equal(request.locationRestriction.center.lat, -5.79);
+  assert.equal(request.locationRestriction.center.lng, -35.21);
+  assert.equal(request.includedPrimaryTypes[0], 'hospital');
+  assert.equal(request.maxResultCount, 8);
+  assert.deepEqual(Array.from(request.fields),
+    ['displayName', 'location', 'formattedAddress', 'googleMapsURI']);
+  assert.throws(() => context.buildNearbySearchRequest('unknown', {lat: 0, lng: 0}), /Categoria/);
+  assert.throws(() => context.buildNearbySearchRequest('hospital', {lat: 99, lng: 0}), /Centro/);
+  assert.throws(() => context.buildNearbySearchRequest('hospital', {lat: 0, lng: Infinity}), /Centro/);
+});
+
+test('links do Google Maps são HTTPS e não aceitam URLs de terceiros', () => {
+  const context = { URL };
+  vm.runInNewContext(
+    snippet('function googleMapsLink(uri)', 'function clearGooglePlacesResults()'),
+    context
+  );
+  assert.equal(context.googleMapsLink('https://www.google.com/maps/place/ABC'),
+    'https://www.google.com/maps/place/ABC');
+  assert.equal(context.googleMapsLink('https://maps.google.com/?q=Brasil'),
+    'https://maps.google.com/?q=Brasil');
+  assert.equal(context.googleMapsLink('javascript:alert(1)'), null);
+  assert.equal(context.googleMapsLink('https://google.com.evil.test/'), null);
+  assert.equal(context.googleMapsLink('http://www.google.com/maps'), null);
+});
+
+test('limpar lugares remove marcadores e invalida buscas antigas', () => {
+  let removed = 0;
+  let closed = 0;
+  const list = { replaceChildren() { this.cleared = true; } };
+  const status = { textContent: '' };
+  const context = {
+    googlePlacesSearchSequence: 3,
+    googlePlaceMarkers: [{setMap(value) { assert.equal(value, null); removed++; }}],
+    googlePlacesInfoWindow: {close() { closed++; }},
+    document: {getElementById(id) {
+      return id === 'google-places-results' ? list : status;
+    }}
+  };
+  vm.runInNewContext(
+    snippet('function clearGooglePlacesResults()', 'async function searchGooglePlacesNearby()'),
+    context
+  );
+  context.clearGooglePlacesResults();
+  assert.equal(context.googlePlacesSearchSequence, 4);
+  assert.equal(removed, 1);
+  assert.equal(closed, 1);
+  assert.equal(context.googlePlaceMarkers.length, 0);
+  assert.equal(list.cleared, true);
+  assert.match(status.textContent, /Resultados limpos/);
+});
+
+test('Google Places exige clique explícito e mantém dados no mapa Google', () => {
+  assert.match(html, /<section id="google-places-panel"/);
+  assert.match(html, /body\.map-mode \.google-places-panel \{ display: flex; \}/);
+  assert.match(html, /id="google-places-search"/);
+  assert.match(html, /document\.getElementById\('google-places-search'\)\.addEventListener\('click', searchGooglePlacesNearby\)/);
+  assert.match(html, /google\.maps\.importLibrary\('places'\)/);
+  assert.match(html, /Place\.searchNearby\(request\)/);
+  assert.match(html, /new google\.maps\.TrafficLayer\(\)\.setMap\(googleMap\)/);
+  assert.match(html, /mapTypeId: 'hybrid'/);
+  assert.doesNotMatch(html, /localStorage\.setItem\(['"]google-places/i);
+});

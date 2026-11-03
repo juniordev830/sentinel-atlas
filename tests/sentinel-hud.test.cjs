@@ -188,11 +188,11 @@ test('controle de rotação respeita movimento reduzido, aba oculta e modo mapa'
     addEventListener(name, handler) { events.motion = handler; }
   };
   const context = {
-    document, window: { matchMedia: () => media },
+    document, motionPreference: media,
     globe: { controls: () => rotation }
   };
   vm.runInNewContext(
-    snippet("globe.controls().autoRotateSpeed = 0.25;", '// Atualiza bússola'),
+    snippet("const rotationToggle = document.getElementById('rotation-toggle');", '// Atualiza bússola'),
     context
   );
   assert.equal(rotation.autoRotate, false, 'movimento reduzido desliga o giro inicialmente');

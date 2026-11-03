@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import math
 import os
 import re
@@ -78,14 +79,20 @@ def _request(url: str, *, params=None, headers=None, text=False):
         raise SourceUnavailable("URL do provedor inválida: HTTPS é obrigatório.")
     try:
         with httpx.Client(timeout=8.0, follow_redirects=False) as client:
-            response = client.get(url, params=params, headers={
+            # Transfere no máximo 1,5 MB descomprimidos: não baixar todo o corpo
+            # antes de aplicar o limite (feeds externos podem ser gigantes).
+            with client.stream("GET", url, params=params, headers={
                 "User-Agent": "SentinelAtlas/0.4 (geospatial public data)",
                 **(headers or {}),
-            })
-            response.raise_for_status()
-            if len(response.content) > 1_500_000:
-                raise SourceUnavailable("Resposta maior que o limite permitido.")
-            return response.text if text else response.json()
+            }) as response:
+                response.raise_for_status()
+                payload = bytearray()
+                for chunk in response.iter_bytes(chunk_size=65_536):
+                    if len(payload) + len(chunk) > 1_500_000:
+                        raise SourceUnavailable("Resposta maior que o limite permitido.")
+                    payload.extend(chunk)
+                body = bytes(payload)
+                return body.decode(response.encoding or "utf-8") if text else json.loads(body)
     except (httpx.HTTPError, ValueError) as error:
         raise SourceUnavailable("Serviço externo indisponível ou sem autorização.") from error
 
@@ -318,7 +325,9 @@ def fetch_layer(layer: str, lat: float, lng: float, *, region: str = "") -> dict
     if state == "external_view" and layer in ("imagery", "traffic"):
         return {**definition, "items": [], "count": 0, "fetched_at": None,
                 "external_url": "https://worldview.earthdata.nasa.gov/" if layer == "imagery" else None}
-    key = (layer, round(lat, 2), round(lng, 2), region)
+    # Coordenadas já foram arredondadas a 5 casas em _coord. Um cache de
+    # apenas 2 casas misturava pontos a centenas de metros de distância.
+    key = (layer, lat, lng, region)
     with _lock:
         stored = _cache.get(key)
         if stored and stored[0] > time.monotonic():

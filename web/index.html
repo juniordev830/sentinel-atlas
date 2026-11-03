@@ -2031,6 +2031,9 @@
             throw new Error('configure GOOGLE_MAPS_API_KEY com restrição por domínio');
           }
           await loadGoogleMaps(config.google_maps_api_key);
+          // O Google 2D e o Google 3D permanecem em visualizadores oficiais separados.
+          document.body.classList.remove('google3d-mode');
+          document.getElementById('google-3d-view').setAttribute('aria-pressed', 'false');
           const camera = globe.pointOfView();
           const center = {
             lat: Number.isFinite(camera?.lat) ? camera.lat : -23.5505,
@@ -2055,19 +2058,82 @@
           setMapView(false);
         }
       }
+      // Mostra a fotogrametria licenciada apenas no mapa oficial do Google:
+      // nenhuma imagem do Google vira textura do globo WebGL do Sentinel.
+      async function openGoogle3DMap() {
+        const status = document.getElementById('api-status');
+        try {
+          const configResponse = await fetch('/api/public-config', {
+            headers: { Accept: 'application/json' }
+          });
+          if (!configResponse.ok) throw new Error('configuração pública indisponível');
+          const config = await configResponse.json();
+          if (!config.google_maps_enabled || !config.google_maps_api_key) {
+            throw new Error('configure GOOGLE_MAPS_API_KEY com restrição por domínio');
+          }
+          await loadGoogleMaps(config.google_maps_api_key);
+          const { Map3DElement } = await google.maps.importLibrary('maps3d');
+          if (typeof Map3DElement !== 'function') {
+            throw new Error('Biblioteca Google Maps 3D indisponível');
+          }
+          const camera = globe.pointOfView();
+          const previousMapCenter = googleMap?.getCenter?.();
+          const useMapCenter = document.body.classList.contains('map-mode') &&
+            !document.body.classList.contains('google3d-mode') && previousMapCenter;
+          const center = {
+            lat: useMapCenter ? previousMapCenter.lat() : (Number.isFinite(camera?.lat) ? camera.lat : -5.7945),
+            lng: useMapCenter ? previousMapCenter.lng() : (Number.isFinite(camera?.lng) ? camera.lng : -35.211)
+          };
+          if (!googleMap3D) {
+            googleMap3D = new Map3DElement({
+              center: { ...center, altitude: 350 },
+              range: 6500,
+              tilt: 65,
+              heading: 0,
+              mode: 'HYBRID'
+            });
+            document.getElementById('map-3d').replaceChildren(googleMap3D);
+          } else {
+            googleMap3D.center = { ...center, altitude: 350 };
+          }
+          setMapView(true);
+          document.body.classList.add('google3d-mode');
+          document.getElementById('google-3d-view').setAttribute('aria-pressed', 'true');
+          status.textContent = 'GOOGLE 3D · imagens fotorrealistas quando disponíveis';
+        } catch (error) {
+          document.body.classList.remove('google3d-mode');
+          document.getElementById('google-3d-view').setAttribute('aria-pressed', 'false');
+          status.textContent = 'GOOGLE 3D INDISPONÍVEL · ' + error.message;
+          if (!googleMap) setMapView(false);
+        }
+      }
       function setMapView(enabled) {
         document.body.classList.toggle('map-mode', enabled);
+        if (!enabled) {
+          document.body.classList.remove('google3d-mode');
+          document.querySelector?.('#google-3d-view')?.setAttribute('aria-pressed', 'false');
+        }
         updateRotation();
         const button = document.getElementById('map-view');
         button.textContent = enabled ? '🌐 Voltar ao globo' : '🛰️ Mapa satélite';
         button.setAttribute('aria-pressed', String(enabled));
       }
       document.getElementById('map-view').addEventListener('click', () => {
-        if (document.body.classList.contains('map-mode')) {
+        if (document.body.classList.contains('google3d-mode')) {
+          openSatelliteMap();
+        } else if (document.body.classList.contains('map-mode')) {
           setMapView(false);
           document.getElementById('api-status').textContent = 'GLOBO 3D · visualização do painel';
         } else {
           openSatelliteMap();
+        }
+      });
+      document.getElementById('google-3d-view').addEventListener('click', () => {
+        if (document.body.classList.contains('google3d-mode')) {
+          setMapView(false);
+          document.getElementById('api-status').textContent = 'GLOBO 3D · visualização do painel';
+        } else {
+          openGoogle3DMap();
         }
       });
 

@@ -1504,6 +1504,9 @@
             const point = estimateSubsolarPoint(new Date());
             const vector = globe.getCoords(point.lat, point.lng, 10);
             sun.position.set(vector.x, vector.y, vector.z);
+            if (cityLightsMesh) {
+              cityLightsMesh.material.uniforms.sunVector.value.copy(sun.position).normalize();
+            }
             const label = document.getElementById('solar-status');
             if (label) label.textContent = '☀ Sol UTC · ' +
               point.lat.toFixed(1) + '°, ' + point.lng.toFixed(1) + '°';
@@ -1535,6 +1538,63 @@
         } catch (error) {
           console.info('Iluminação solar avançada indisponível; mantendo padrão.', error);
         }
+      }
+
+      // Luzes urbanas noturnas renderizadas sobre a metade escura do globo.
+      // Usamos a textura pública de luzes terrestres do globo, nunca tiles Google.
+      // O shader e a geometria são opcionais e desligados no perfil Econômico.
+      let cityLightsMesh = null;
+      let cityLightsRequested = false;
+      function loadCityLights() {
+        if (!window.THREE || cityLightsRequested) return;
+        cityLightsRequested = true;
+        new THREE.TextureLoader().load(textures.night, image => {
+          try {
+            if (THREE.SRGBColorSpace) image.colorSpace = THREE.SRGBColorSpace;
+            const material = new THREE.ShaderMaterial({
+              uniforms: {
+                cityTexture: { value: image },
+                sunVector: { value: new THREE.Vector3(1, 0, 0) }
+              },
+              vertexShader: `
+                varying vec2 vCityUv;
+                varying vec3 vNormalWorld;
+                void main() {
+                  vCityUv = uv;
+                  vNormalWorld = normalize(mat3(modelMatrix) * normal);
+                  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+              `,
+              fragmentShader: `
+                uniform sampler2D cityTexture;
+                uniform vec3 sunVector;
+                varying vec2 vCityUv;
+                varying vec3 vNormalWorld;
+                void main() {
+                  vec3 image = texture2D(cityTexture, vCityUv).rgb;
+                  float sunlight = dot(normalize(vNormalWorld), normalize(sunVector));
+                  float darkness = 1.0 - smoothstep(-0.2, 0.25, sunlight);
+                  float brightness = max(max(image.r, image.g), image.b);
+                  float glow = darkness * smoothstep(0.035, 0.58, brightness);
+                  gl_FragColor = vec4(image * 1.25, glow * 0.7);
+                }
+              `,
+              blending: THREE.AdditiveBlending,
+              transparent: true,
+              depthWrite: false,
+              side: THREE.FrontSide
+            });
+            const geometry = new THREE.SphereGeometry(globe.getGlobeRadius() * 1.002, 96, 64);
+            cityLightsMesh = new THREE.Mesh(geometry, material);
+            if (typeof sun !== 'undefined') {
+              cityLightsMesh.material.uniforms.sunVector.value.copy(sun.position).normalize();
+            }
+            globe.scene().add(cityLightsMesh);
+            applyRenderQuality();
+          } catch (error) {
+            console.info('Luzes urbanas indisponíveis; globo mantém textura diurna.', error);
+          }
+        }, undefined, () => console.info('Textura noturna indisponível; não há luzes urbanas.'));
       }
 
       // Nuvens independentes carregadas sob demanda (evita gastar dados no modo Econômico).
@@ -1613,7 +1673,12 @@
           globeMaterial.bumpScale = profile.bump;
           globeMaterial.needsUpdate = true;
         }
-        if (profile.clouds) loadClouds();
+        if (profile.clouds) {
+          loadClouds();
+          loadCityLights();
+        }
+        if (cityLightsMesh) cityLightsMesh.visible =
+          profile.mode !== 'eco' && currentTexture === 'day';
         if (cloudsMesh) {
           cloudsMesh.visible = profile.clouds;
           cloudsMesh.material.opacity = profile.opacity;
@@ -1763,7 +1828,9 @@
       document.getElementById('texture-toggle').addEventListener('click', event => {
         currentTexture = currentTexture === 'night' ? 'day' : 'night';
         globe.globeImageUrl(textures[currentTexture]);
-        event.currentTarget.innerHTML = currentTexture === 'night' ? '☀️ Luz do dia' : '🌙 Luz noturna';
+        if (cityLightsMesh) cityLightsMesh.visible =
+          currentTexture === 'day' && renderQualityControl.dataset.resolved !== 'eco';
+        event.currentTarget.textContent = currentTexture === 'night' ? '☀️ Luz do dia' : '🌙 Luz noturna';
       });
 
       async function replayHistory() {

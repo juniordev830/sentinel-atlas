@@ -2435,6 +2435,161 @@
           geointStatus.textContent = 'Catálogo indisponível. Inicie a API FastAPI para carregar as fontes.';
         }
       }
+
+      // Meteorologia visual: cada consulta é uma ação humana explícita.
+      // Um ponto meteorológico representa um modelo para uma coordenada; não um mapa
+      // contínuo de calor ou chuva para toda a cidade.
+      const weatherPanel = document.getElementById('weather-panel');
+      const weatherToggle = document.getElementById('weather-toggle');
+      const weatherSource = document.getElementById('weather-source');
+      const weatherFetch = document.getElementById('weather-fetch');
+      const weatherStatus = document.getElementById('weather-status');
+      const weatherMetrics = document.getElementById('weather-metrics');
+      const weatherEvents = document.getElementById('weather-events');
+      const weatherSources = new Set(['weather', 'air_quality', 'extreme_events', 'wildfires']);
+      let weatherSequence = 0;
+      let weatherLastLayer = null;
+
+      function formatWeatherMeasurement(value, unit = '') {
+        return typeof value === 'number' && Number.isFinite(value)
+          ? value.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + unit
+          : 'Não informado';
+      }
+
+      function renderWeatherMeasurements(item) {
+        weatherMetrics.replaceChildren();
+        const measures = item && typeof item.measurements === 'object' && item.measurements
+          ? item.measurements : {};
+        const values = [
+          ['temperature_c', 'Temperatura', ' °C'],
+          ['humidity_pct', 'Umidade', '%'],
+          ['wind_speed_kmh', 'Vento', ' km/h'],
+          ['wind_direction_deg', 'Vento de', '°'],
+          ['precipitation_mm', 'Precipitação', ' mm'],
+          ['cloud_cover_pct', 'Nuvens', '%'],
+          ['pm25_ugm3', 'PM2.5', ' µg/m³'],
+          ['pm10_ugm3', 'PM10', ' µg/m³'],
+          ['us_aqi', 'AQI (EUA)', '']
+        ];
+        for (const [key, label, unit] of values) {
+          const value = measures[key];
+          if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+          const card = document.createElement('div');
+          card.className = 'weather-metric';
+          const title = document.createElement('span');
+          title.textContent = label;
+          const display = document.createElement('strong');
+          display.textContent = formatWeatherMeasurement(value, unit);
+          card.append(title, display);
+          if (key === 'wind_direction_deg') {
+            const arrow = document.createElement('span');
+            arrow.className = 'weather-wind-arrow';
+            arrow.textContent = '➤';
+            // O ângulo do provedor indica DE ONDE o vento vem (norte = 0°).
+            // Esta seta aponta para onde o vento sopra, usando o leste como 0° CSS.
+            arrow.style.transform = 'rotate(' + ((value + 90) % 360) + 'deg)';
+            arrow.title = 'Direção para onde o vento sopra (estimativa)';
+            card.append(arrow);
+          }
+          weatherMetrics.append(card);
+        }
+      }
+
+      function clearWeatherVisuals() {
+        weatherSequence += 1;
+        weatherFetch.disabled = false;
+        if (weatherLastLayer) replaceAssets('geoint-' + weatherLastLayer, []);
+        weatherLastLayer = null;
+        weatherMetrics.replaceChildren();
+        weatherEvents.replaceChildren();
+        weatherStatus.textContent = 'Dados removidos. Nenhuma fonte foi consultada novamente.';
+      }
+
+      async function queryWeatherVisualLayer() {
+        const source = weatherSource.value;
+        if (!weatherSources.has(source)) {
+          weatherStatus.textContent = 'Fonte não permitida.';
+          return;
+        }
+        const requestId = ++weatherSequence;
+        weatherFetch.disabled = true;
+        const previousLayer = weatherLastLayer;
+        if (previousLayer && previousLayer !== source) {
+          replaceAssets('geoint-' + previousLayer, []);
+        }
+        weatherLastLayer = source;
+        weatherMetrics.replaceChildren();
+        weatherEvents.replaceChildren();
+        weatherStatus.textContent = 'Consultando provedor oficial sob demanda…';
+        const camera = globe.pointOfView() || {lat: 0, lng: -30};
+        const params = new URLSearchParams({
+          lat: String(Number.isFinite(camera.lat) ? camera.lat : 0),
+          lng: String(Number.isFinite(camera.lng) ? camera.lng : -30)
+        });
+        try {
+          const response = await fetch('/api/geoint/layers/' + source + '?' + params, {
+            headers: {Accept: 'application/json'}
+          });
+          if (!response.ok) throw new Error('API não respondeu');
+          const data = await response.json();
+          if (requestId !== weatherSequence || source !== weatherSource.value) return;
+          const status = String(data.status || 'unavailable');
+          if (!['ok', 'empty'].includes(status)) {
+            replaceAssets('geoint-' + source, []);
+            weatherStatus.textContent = status === 'requires_configuration'
+              ? 'Fonte exige configuração no servidor. Nenhum dado fictício foi exibido.'
+              : 'Fonte indisponível. Marcadores anteriores foram removidos.';
+            return;
+          }
+          const items = Array.isArray(data.items) ? data.items.slice(0, 75) : [];
+          const points = items.filter(item => item &&
+            typeof item.lat === 'number' && Number.isFinite(item.lat) &&
+            Math.abs(item.lat) <= 90 &&
+            typeof item.lng === 'number' && Number.isFinite(item.lng) &&
+            Math.abs(item.lng) <= 180
+          ).map(item => ({
+            id: String(item.id), type: 'geoint-' + source,
+            lat: item.lat, lng: item.lng, altitude: 0.04,
+            label: String(item.title) + ' · ' + String(item.detail || data.provider || source) +
+              ' [' + String(item.data_kind || data.data_kind || 'fonte') + ']',
+            color: geointColors[source] || '#7dd3fc'
+          }));
+          replaceAssets('geoint-' + source, points);
+          if (points.length) document.querySelector('[data-layer="all"]')?.click();
+          renderWeatherMeasurements(items[0]);
+          if (source === 'extreme_events' || source === 'wildfires') {
+            for (const item of items.slice(0, 8)) {
+              const row = document.createElement('li');
+              row.textContent = String(item.title) + (item.timestamp ? ' · ' + item.timestamp : '');
+              weatherEvents.append(row);
+            }
+          }
+          const kind = (source === 'weather' || source === 'air_quality') ? 'modelo'
+            : source === 'wildfires' ? 'detecção orbital' : 'eventos catalogados globais';
+          const sampledAt = items[0]?.timestamp ? ' · dado: ' + items[0].timestamp + ' UTC' : '';
+          weatherStatus.textContent = (status === 'empty' ? 'Nenhum item retornado' : points.length + ' ponto(s) geográfico(s)') +
+            ' · ' + kind + ' · ' + String(data.provider || source) +
+            (data.cached ? ' · cache' : '') + sampledAt;
+        } catch {
+          if (requestId !== weatherSequence) return;
+          replaceAssets('geoint-' + source, []);
+          weatherStatus.textContent = 'Consulta falhou. Nenhuma informação anterior é exibida como atual.';
+        } finally {
+          if (requestId === weatherSequence) weatherFetch.disabled = false;
+        }
+      }
+
+      weatherToggle.addEventListener('click', () => {
+        weatherPanel.hidden = !weatherPanel.hidden;
+        weatherToggle.setAttribute('aria-expanded', String(!weatherPanel.hidden));
+      });
+      document.getElementById('weather-close').addEventListener('click', () => {
+        weatherPanel.hidden = true;
+        weatherToggle.setAttribute('aria-expanded', 'false');
+      });
+      document.getElementById('weather-clear').addEventListener('click', clearWeatherVisuals);
+      weatherSource.addEventListener('change', clearWeatherVisuals);
+      weatherFetch.addEventListener('click', queryWeatherVisualLayer);
       }
 
       function setGlobeControlsEnabled(enabled) {

@@ -1579,9 +1579,9 @@
 
       function getRenderProfile(requested, devicePixelRatio = 1, compact = false, reducedMotion = false, memoryGb = 4, cpuCores = 4) {
         const modes = {
-          ultra: { dpr: 2, curvature: 1.5, points: 18, arcSegments: 96, arcRadial: 10, atmosphere: .19, bump: 2.5, clouds: true, opacity: .30 },
-          balanced: { dpr: 1.5, curvature: 3, points: 12, arcSegments: 64, arcRadial: 6, atmosphere: .17, bump: 1.8, clouds: true, opacity: .24 },
-          eco: { dpr: 1, curvature: 6, points: 6, arcSegments: 30, arcRadial: 4, atmosphere: .12, bump: .75, clouds: false, opacity: 0 }
+          ultra: { dpr: 2, curvature: 1.5, points: 18, arcSegments: 96, arcRadial: 10, atmosphere: .15, bump: 1.2, clouds: true, opacity: .26 },
+          balanced: { dpr: 1.5, curvature: 3, points: 12, arcSegments: 64, arcRadial: 6, atmosphere: .13, bump: .85, clouds: true, opacity: .20 },
+          eco: { dpr: 1, curvature: 6, points: 6, arcSegments: 30, arcRadial: 4, atmosphere: .10, bump: .35, clouds: false, opacity: 0 }
         };
         const powerfulDesktop = !compact && !reducedMotion &&
           Number(memoryGb) >= 8 && Number(cpuCores) >= 8;
@@ -1658,6 +1658,28 @@
         document.getElementById('inspector').hidden = true;
       }
       document.getElementById('reset-camera').addEventListener('click', resetGlobalView);
+
+      // Coordenadas estáticas de atalhos; não são dados de trânsito/localização pessoal.
+      const cameraDestinations = Object.freeze({
+        natal: { lat: -5.7945, lng: -35.211, label: 'Natal · RN' },
+        recife: { lat: -8.0543, lng: -34.8813, label: 'Recife · PE' },
+        brasilia: { lat: -15.7939, lng: -47.8828, label: 'Brasília · DF' },
+        saopaulo: { lat: -23.5505, lng: -46.6333, label: 'São Paulo · SP' },
+        rio: { lat: -22.9068, lng: -43.1729, label: 'Rio de Janeiro · RJ' }
+      });
+      function flyToDestination(key) {
+        if (!Object.hasOwn(cameraDestinations, key)) return false;
+        const selected = cameraDestinations[key];
+        setMapView(false);
+        globe.pointOfView({ lat: selected.lat, lng: selected.lng, altitude: .46 },
+          motionPreference.matches ? 0 : 1700);
+        document.getElementById('api-status').textContent =
+          'SOBREVOO · ' + selected.label + ' · coordenadas de referência';
+        return true;
+      }
+      document.getElementById('camera-go').addEventListener('click', () => {
+        flyToDestination(document.getElementById('camera-destination').value);
+      });
 
       // Atualiza bússola e coordenadas HUD no movimento da câmera
       function updateHUD() {
@@ -2118,14 +2140,18 @@
             throw new Error('configure GOOGLE_MAPS_API_KEY com restrição por domínio');
           }
           await loadGoogleMaps(config.google_maps_api_key);
-          // O Google 2D e o Google 3D permanecem em visualizadores oficiais separados.
-          document.body.classList.remove('google3d-mode');
-          document.getElementById('google-3d-view').setAttribute('aria-pressed', 'false');
+          // Ao mudar do Google 3D para o 2D, preserva o centro visualizado.
+          const wasGoogle3D = document.body.classList.contains('google3d-mode');
+          const center3D = wasGoogle3D ? googleMap3D?.center : null;
           const camera = globe.pointOfView();
           const center = {
-            lat: Number.isFinite(camera?.lat) ? camera.lat : -23.5505,
-            lng: Number.isFinite(camera?.lng) ? camera.lng : -46.6333
+            lat: Number.isFinite(center3D?.lat) ? center3D.lat :
+              (Number.isFinite(camera?.lat) ? camera.lat : -23.5505),
+            lng: Number.isFinite(center3D?.lng) ? center3D.lng :
+              (Number.isFinite(camera?.lng) ? camera.lng : -46.6333)
           };
+          document.body.classList.remove('google3d-mode');
+          document.getElementById('google-3d-view').setAttribute('aria-pressed', 'false');
           // Exibir primeiro: o Google Maps precisa de um contêiner visível para inicializar.
           setMapView(true);
           if (!googleMap) {
@@ -2194,6 +2220,29 @@
           if (!googleMap) setMapView(false);
         }
       }
+      function adjustGoogle3DCamera(action) {
+        if (!googleMap3D || !document.body.classList.contains('google3d-mode')) return false;
+        if (action === 'zoom-in') {
+          googleMap3D.range = Math.max(300, (Number(googleMap3D.range) || 6500) * .65);
+        } else if (action === 'zoom-out') {
+          googleMap3D.range = Math.min(35000, (Number(googleMap3D.range) || 6500) * 1.5);
+        } else if (action === 'rotate') {
+          googleMap3D.heading = ((Number(googleMap3D.heading) || 0) + 45) % 360;
+        } else {
+          return false;
+        }
+        document.getElementById('api-status').textContent =
+          'GOOGLE 3D · câmera: ' + Math.round(Number(googleMap3D.range)) +
+          ' m · cobertura variável';
+        return true;
+      }
+      document.getElementById('google3d-zoom-in').addEventListener('click', () =>
+        adjustGoogle3DCamera('zoom-in'));
+      document.getElementById('google3d-zoom-out').addEventListener('click', () =>
+        adjustGoogle3DCamera('zoom-out'));
+      document.getElementById('google3d-rotate').addEventListener('click', () =>
+        adjustGoogle3DCamera('rotate'));
+
       function setMapView(enabled) {
         document.body.classList.toggle('map-mode', enabled);
         if (!enabled) {

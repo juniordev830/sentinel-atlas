@@ -196,3 +196,50 @@ def test_geoint_streamed_json_response(monkeypatch):
         )
     )
     assert layers._request("https://example.org/feed") == {"entries": [1, 2]}
+
+
+def test_weather_structured_measurements_for_visuals(monkeypatch):
+    """Valores numéricos verdadeiros com direção meteorológica, sem números inventados."""
+    def fake_request(url, **kwargs):
+        assert "wind_direction_10m" in kwargs["params"]["current"]
+        return {"current": {
+            "temperature_2m": 27, "relative_humidity_2m": 81,
+            "wind_speed_10m": 18.5, "wind_direction_10m": 135,
+            "precipitation": 0.4, "cloud_cover": 92, "time": "2026-11-02T22:00"
+        }}
+    monkeypatch.setattr(layers, "_request", fake_request)
+    items, _ = layers._run_layer("weather", -5.8, -35.2, "")
+    assert len(items) == 1
+    assert items[0]["data_kind"] == "model"
+    assert items[0]["measurements"] == {
+        "temperature_c": 27.0, "humidity_pct": 81.0,
+        "wind_speed_kmh": 18.5, "wind_direction_deg": 135.0,
+        "precipitation_mm": 0.4, "cloud_cover_pct": 92.0
+    }
+
+
+def test_weather_measurements_reject_invalid_and_boolean_values(monkeypatch):
+    monkeypatch.setattr(layers, "_request", lambda *_args, **_kwargs: {
+        "current": {
+            "temperature_2m": float("nan"), "relative_humidity_2m": 105,
+            "wind_speed_10m": True, "wind_direction_10m": 720,
+            "precipitation": -1, "cloud_cover": 30, "time": "2026-11-02T12:00"
+        }
+    })
+    items, _ = layers._run_layer("weather", 1, 2, "")
+    measurements = items[0]["measurements"]
+    assert measurements == {
+        "temperature_c": None, "humidity_pct": None,
+        "wind_speed_kmh": None, "wind_direction_deg": None,
+        "precipitation_mm": None, "cloud_cover_pct": 30.0
+    }
+
+
+def test_air_quality_measurements_for_visuals(monkeypatch):
+    monkeypatch.setattr(layers, "_request", lambda *_args, **_kwargs: {
+        "current": {"pm2_5": 12.5, "pm10": 32.3, "us_aqi": 48, "time": "2026-11-02T21:00"}
+    })
+    items, _ = layers._run_layer("air_quality", -5, -35, "")
+    assert items[0]["measurements"] == {
+        "pm25_ugm3": 12.5, "pm10_ugm3": 32.3, "us_aqi": 48.0
+    }

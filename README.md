@@ -45,6 +45,30 @@ O Sentinel Atlas agora oferece **três experiências distintas**:
 
 Documentação: [Google Maps JavaScript API 3D](https://developers.google.com/maps/documentation/javascript/3d/overview) · [Map3DElement](https://developers.google.com/maps/documentation/javascript/reference/3d-map) · [Preço e faturamento](https://developers.google.com/maps/documentation/javascript/usage-and-billing).
 
+## Melhorias visuais · renderização, navegação e meteorologia
+
+### Terra mais natural
+- **Noite urbana automática:** shader com textura noturna e máscara de incidência solar calculada; ilumina cidades no lado escuro do globo sem usar imagens/tiles do Google. O efeito é opcional e é desabilitado no perfil `Econômico` e ao selecionar manualmente a textura noturna.
+- **Relevo e atmosfera calibrados:** intensidade do relevo e espessura do halo reduzidas para evitar montanhas e brilho artificiais. Os perfis `Ultra`, `Equilibrado` e `Econômico` continuam funcionando.
+- **Nuvens:** camada decorativa carregada sob demanda, não uma estimativa de nuvens em tempo real. O modo Econômico não carrega essa camada.
+
+### Navegação cinematográfica e Google 3D
+- Na barra de ferramentas, selecione um **Destino** e clique em **✈ Sobrevoar**: Natal, Recife, Brasília, São Paulo ou Rio de Janeiro. O globo faz um movimento suave ou instantâneo caso o dispositivo prefira movimento reduzido.
+- Depois do sobrevoo, clique em **🏙️ Google 3D** para abrir o componente fotorrealista oficial na região indicada, **se a chave estiver configurada**. Nesse modo aparecem botões para aproximar, afastar e girar a câmera. O alcance é limitado para evitar saltos exagerados.
+- Ao alternar do mapa 3D do Google para o mapa 2D, a câmera tenta preservar o centro selecionado. Dados Google são renderizados unicamente em componentes oficiais, com suas atribuições e regras de uso. Movimentos no mapa 3D podem gerar novas requisições e custos de uso.
+
+### Meteorologia e eventos naturais
+- O botão **☁ Meteorologia** abre um painel lateral; nenhuma consulta é feita automaticamente.
+- **Open-Meteo (modelo):** temperatura, umidade, vento, direção do vento, precipitação e cobertura de nuvens, quando retornados. Uma seta indica o sentido para o qual o vento sopra; a direção original fornecida pelo provedor indica de onde ele vem. Valores ausentes e inválidos não são exibidos como números.
+- **Qualidade do ar (modelo):** PM2.5, PM10 e AQI (EUA), quando disponíveis.
+- **NASA EONET:** até oito eventos catalogados listados no painel e marcadores com coordenadas retornadas pela API. **É um feed de eventos globais**, não uma varredura local ou alerta de emergência.
+- **NASA FIRMS:** detecções térmicas somente quando `FIRMS_MAP_KEY` estiver configurada; não são incêndios confirmados.
+- O painel informa a categoria do dado (modelo/evento/detecção), a fonte, timestamps disponíveis e se a resposta veio do cache. A visualização representa pontos consultados, **não** um radar meteorológico, campo vetorial regional ou mapa contínuo de temperatura.
+- As camadas consultadas podem ser removidas com **Limpar dados**. Ao trocar a fonte ou se uma consulta falha, os marcadores antigos são removidos para evitar informações desatualizadas.
+- Todas as chamadas continuam autenticadas pelo backend quando `SENTINEL_API_TOKEN` está configurado.
+
+**Fontes e limites:** [Open-Meteo Forecast](https://open-meteo.com/en/docs), [Open-Meteo Air Quality](https://open-meteo.com/en/docs/air-quality-api), [NASA EONET](https://eonet.gsfc.nasa.gov/docs/v3), [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/). Use as fontes conforme termos e licenças; cobertura e latência variam.
+
 ## Google Maps e Places API (New)
 
 O painel **God's Eye View** oferece um mapa 2D com imagens de satélite e nomes de vias (tipo híbrido), camada visual de trânsito do Google Maps, Street View (quando disponível) e buscas de estabelecimentos próximos.

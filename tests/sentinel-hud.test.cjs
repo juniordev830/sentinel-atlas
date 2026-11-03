@@ -479,7 +479,7 @@ test('painel GeoINT expõe 16 categorias sem consultas automáticas', () => {
   assert.match(html, /id="toggle-geoint"/);
   assert.match(html, /id="geoint-uf"/);
   assert.match(html, /id="geoint-source-list"/);
-  assert.match(html, /geointCatalog\.length !== 16/);
+  assert.match(html, /payload\.layers\.length !== 16/);
   assert.match(html, /\/api\/geoint\/layers'/);
   assert.match(html, /queryGeointLayer\(layer, row, button, output\)/);
   assert.match(html, /button\.addEventListener\('click', \(\) => queryGeointLayer/);

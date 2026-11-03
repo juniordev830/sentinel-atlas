@@ -110,6 +110,23 @@ settings = Settings.from_environment()
 ai_analyzer = GeoINTAnalyzer()
 store = GeofenceStore(os.getenv("SENTINEL_DB_PATH", str(ROOT / ".data" / "sentinel.sqlite3")))
 geofences: dict[str, tuple[Geofence, AutomationEngine]] = {}
+
+# Métricas leves em memória para diagnosticar a API sem persistir dados de usuários.
+_metrics_started_at = time.time()
+_metrics_requests_total = 0
+_metrics_status_counts: dict[str, int] = {}
+_metrics_route_counts: dict[str, int] = {}
+
+
+def _record_request(path: str, status_code: int, duration_ms: float) -> None:
+    global _metrics_requests_total
+    _metrics_requests_total += 1
+    status_key = str(status_code)
+    _metrics_status_counts[status_key] = _metrics_status_counts.get(status_key, 0) + 1
+    route_key = path or "/"
+    current = _metrics_route_counts.get(route_key, 0)
+    _metrics_route_counts[route_key] = current + 1
+
 for saved_fence in store.list():
     geofences[saved_fence.name] = (saved_fence, AutomationEngine(saved_fence))
 
@@ -186,7 +203,14 @@ async def optional_token_auth(request: Request, call_next):
             ):
                 return JSONResponse(status_code=403, content={"detail": "Origem da requisição inválida"})
 
-    return await call_next(request)
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        _record_request(path, 500, (time.perf_counter() - started) * 1000)
+        raise
+    _record_request(path, response.status_code, (time.perf_counter() - started) * 1000)
+    return response
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -289,6 +313,18 @@ def end_browser_session(response: Response) -> dict[str, bool]:
 @app.get("/api/health")
 def health() -> dict[str, object]:
     return {"status": "ok", "service": "Sentinel Atlas API", "timestamp": time.time()}
+
+
+@app.get("/api/metrics")
+def metrics() -> dict[str, Any]:
+    """Retorna contadores operacionais do processo sem expor tokens ou dados de posição."""
+    return {
+        "service": "Sentinel Atlas API",
+        "uptime_seconds": round(max(0.0, time.time() - _metrics_started_at), 3),
+        "requests_total": _metrics_requests_total,
+        "responses_by_status": dict(sorted(_metrics_status_counts.items())),
+        "requests_by_path": dict(sorted(_metrics_route_counts.items())),
+    }
 
 
 @app.get("/api/sources")

@@ -24,13 +24,26 @@ No painel do **God's Eye View**, a área **Camadas** filtra os tipos de objetos 
 - **◫ Tela limpa / ▦ Mostrar painel:** ativa uma apresentação imersiva que esconde os painéis auxiliares sem bloquear o globo; o botão no topo ou a tecla `Esc` restauram os controles.
 - **Visual tático:** uma moldura de comando com retículo, grade discreta e varredura visual opcional. Esses elementos são apenas decorativos, não indicam detecção de eventos e não interceptam cliques. A moldura desaparece no mapa 2D ou se o WebGL estiver indisponível.
 - **Qualidade gráfica:** `Automático` usa Ultra em desktops com pelo menos 8 GB de memória e 8 núcleos informados pelo navegador, Equilibrado em outros desktops e Econômico em telas pequenas/dispositivos que solicitam movimento reduzido. `Ultra · 3D` libera geometria mais detalhada, suavização e até 2× de resolução física por pixel CSS, exigindo GPU e memória mais fortes. `Equilibrado` mantém boa fidelidade; `Econômico` reduz polígonos, resolução e desliga a nuvem 3D opcional. Os perfis podem ser trocados sem recarregar.
-- **Terra renderizada:** textura diurna por padrão, modo noturno manual, relevo menos artificial, atmosfera com halo e iluminação solar simulada. A iluminação e as nuvens são efeitos visuais, **não representam condições meteorológicas/solares observadas em tempo real**.
+- **Terra renderizada:** textura diurna por padrão, modo noturno manual, relevo menos artificial, atmosfera com halo, reflexos oceânicos por máscara de água e iluminação solar estimada pelo horário UTC (aproximação astronômica). A posição do Sol é recalculada a cada minuto enquanto a aba está visível. **As nuvens são textura ilustrativa, não meteorologia observada ao vivo.**
 - **⏸️ Pausar giro / ▶️ Retomar giro:** liga ou desliga a rotação automática; a rotação também é suspensa quando a aba fica oculta ou o usuário abre o mapa 2D. A preferência de acessibilidade por movimento reduzido é respeitada inicialmente e quando alterada.
 - **🎯 Visão global:** fecha o inspetor, retorna do mapa 2D (se necessário) e recentraliza a câmera do globo.
 - **Busca de objetos:** digite nomes ou identificadores; a busca considera a camada selecionada e continua aplicada quando a fonte de dados atualiza. Pressione `/` para focar a busca e `Esc` para limpá-la.
 - **Geofences:** quando a API responde com uma lista vazia, o painel deixa de exibir geofences demonstrativas para evitar confusão com registros reais.
 
 **Importante:** avião, navio, trânsito e parte dos satélites exibidos inicialmente são *dados simulados*. Camadas externas (como USGS) e outras integrações só devem ser consideradas atualizadas após respostas bem-sucedidas de suas respectivas fontes. A indicação de API online não significa que todos os provedores externos estejam operacionais.
+
+## Google Maps 3D fotorrealista (visualizador oficial)
+
+O Sentinel Atlas agora oferece **três experiências distintas**:
+1. **Globo 3D independente**, com textura Blue Marble e luz solar estimada em UTC, sem Google Maps.
+2. **Mapa satélite Google 2D**, com mapa híbrido, trânsito e busca manual no Google Places.
+3. **🏙️ Google 3D**, visualização imersiva por meio da classe oficial `Map3DElement` da Maps JavaScript API (biblioteca `maps3d`, `mode: HYBRID`). O mapa inicia com a região apontada pelo globo (ou pelo mapa 2D, se ele estiver aberto) e permite explorar detalhes do relevo e de construções **onde houver cobertura**. Você pode voltar ao globo ou alternar para o mapa satélite.
+
+**Como ativar:** habilite a Maps JavaScript API no Google Cloud, configure faturamento e chave restrita por HTTP referrers e por API, conforme as instruções abaixo. Com o backend rodando, clique em **Google 3D**. O componente só é criado após esse clique: não há pré-carregamento automático de imagens 3D. Para abrir com aceleração gráfica, habilite WebGL/aceleração de hardware no navegador.
+
+**Licenciamento:** imagens e fotogrametria do Google são renderizadas somente pelo próprio componente Google Maps, com seus créditos e controles. Não copiamos tiles, imagens de satélite, prédios, nem dados brutos da plataforma para a textura do globo WebGL. Não armazenamos conteúdo do Google em cache próprio. A biblioteca 3D pode exigir recursos específicos do navegador, apresentar cobertura desigual ou gerar custos de **Immersive Maps**. Avalie cotas e alertas de faturamento no Google Cloud antes de disponibilizar publicamente.
+
+Documentação: [Google Maps JavaScript API 3D](https://developers.google.com/maps/documentation/javascript/3d/overview) · [Map3DElement](https://developers.google.com/maps/documentation/javascript/reference/3d-map) · [Preço e faturamento](https://developers.google.com/maps/documentation/javascript/usage-and-billing).
 
 ## Google Maps e Places API (New)
 

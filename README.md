@@ -32,6 +32,34 @@ No painel do **God's Eye View**, a área **Camadas** filtra os tipos de objetos 
 
 **Importante:** avião, navio, trânsito e parte dos satélites exibidos inicialmente são *dados simulados*. Camadas externas (como USGS) e outras integrações só devem ser consideradas atualizadas após respostas bem-sucedidas de suas respectivas fontes. A indicação de API online não significa que todos os provedores externos estejam operacionais.
 
+## Google Maps e Places API (New)
+
+O painel **God's Eye View** oferece um mapa 2D com imagens de satélite e nomes de vias (tipo híbrido), camada visual de trânsito do Google Maps, Street View (quando disponível) e buscas de estabelecimentos próximos.
+
+**Como habilitar dados reais:**
+
+1. Crie ou selecione um projeto no [Google Cloud Console](https://console.cloud.google.com/), vincule uma conta de faturamento e configure alertas/cotas de uso.
+2. Ative **Maps JavaScript API**. Para buscar lugares próximos, ative também **Places API (New)**; usar o mapa sem buscas de lugares não requer fazer consultas Places.
+3. Crie uma **chave de API para navegador**, restrita por **HTTP referrers** (domínios onde o painel será servido, como `http://localhost:8000/*` para testes locais) e pelas APIs necessárias. Nunca use o token administrativo do Sentinel Atlas como chave do Maps.
+4. Configure somente no seu ambiente, nunca no GitHub:
+   ```bash
+   export GOOGLE_MAPS_API_KEY="sua-chave-restrita-ao-site"
+   uvicorn backend.app:app --reload
+   ```
+   No Windows, use `$env:GOOGLE_MAPS_API_KEY="sua-chave-restrita-ao-site"` ou um arquivo `.env` local ignorado pelo Git.
+5. Abra `http://localhost:8000`, clique em **Mapa satélite** e aguarde o mapa. Selecione uma categoria e clique em **Buscar nesta área** para uma consulta explícita, limitada aos **8 primeiros locais** em um raio de **1,5 km** do centro atual (sem atualização automática).
+
+**O que é exibido:** mapa híbrido (satélite + rótulos), camada visual de trânsito, marcadores, nomes e endereços retornados por Google Places, com opção de abrir cada local no Google Maps. O botão **Limpar** remove os resultados temporários. O aplicativo **não** extrai velocidade do trânsito ou bases cartográficas brutas, nem armazena dados de Places em SQLite, arquivos ou localStorage.
+
+**Regras importantes:**
+
+- Os resultados Google Places são exibidos **somente no mapa oficial do Google**; não são copiados para o globo 3D de outro provedor. A interface deve preservar as atribuições e o logo do Google fornecidos pelo mapa.
+- Uma chave da Maps JavaScript API **é visível ao navegador por definição**: proteja-a com restrições de site/API, limites de cota e monitoramento de custos. Não coloque chaves privadas de servidor em `/api/public-config`.
+- Sem chave, permissões, faturamento ou conexão, o mapa do Google e o Places ficam indisponíveis; o globo demonstrativo, USGS e OSM são camadas independentes.
+- A cobertura e a atualização do trânsito, do satélite, do Street View e dos locais variam por região; não são necessariamente em tempo real.
+- Para distribuição pública, mantenha uma política de privacidade e termos de uso adequados às regras do Google Maps Platform.
+- Consulte a [documentação oficial da Maps JavaScript API](https://developers.google.com/maps/documentation/javascript/get-api-key), [Nearby Search (New)](https://developers.google.com/maps/documentation/javascript/nearby-search) e as [políticas de atribuição do Places](https://developers.google.com/maps/documentation/places/web-service/policies).
+
 ## Arquitetura
 
 | Componente | Responsabilidade |

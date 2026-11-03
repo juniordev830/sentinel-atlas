@@ -1,0 +1,176 @@
+/* Sentinel Atlas visual language. The map and globe remain interactive when available. */
+:root {
+  --panel: rgba(7, 19, 35, .84);
+  --panel-border: rgba(127, 211, 235, .2);
+  --cyan: #76e6f4;
+  --green: #8af0bd;
+  --muted: #acc2d1;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 65% 65% at 50% 42%, rgba(11, 87, 119, .32), transparent 73%),
+    radial-gradient(ellipse 34% 38% at 60% 62%, rgba(26, 118, 139, .12), transparent 86%),
+    #040c18;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 8% 15%, #d3fbff 90%, transparent),
+    radial-gradient(1px 1px at 30% 62%, #c8e9ff 90%, transparent),
+    radial-gradient(2px 2px at 77% 17%, #90dbea 60%, transparent),
+    radial-gradient(1px 1px at 85% 82%, #d3fbff 90%, transparent);
+  background-size: 255px 195px, 311px 260px, 383px 310px, 471px 350px;
+  opacity: .28;
+}
+
+.hud { padding: clamp(14px, 2vw, 28px); }
+.brand, .panel {
+  border: 1px solid rgba(147, 214, 231, .2);
+  border-radius: 18px;
+  background: linear-gradient(155deg, rgba(12, 31, 51, .93), rgba(5, 16, 32, .85));
+  box-shadow: 0 20px 48px rgba(0, 5, 16, .35), inset 0 1px 0 rgba(210, 245, 255, .08);
+  backdrop-filter: blur(20px) saturate(130%);
+}
+.brand {
+  min-height: 72px;
+  padding: 13px 20px;
+  border-left: 3px solid #81e6eb;
+}
+.brand strong { font-size: 16px; letter-spacing: .13em; }
+.brand span { margin-top: 4px; font-size: 11px; color: #b4d0dd; }
+.brand small { margin-top: 5px; color: #84e0ed; }
+.brand-icon { width: 11px; height: 11px; background: #82e7be; }
+.topbar .tools { gap: 12px; }
+#asset-search {
+  width: min(290px, 28vw);
+  min-height: 43px;
+  background: rgba(8, 24, 41, .88);
+  border-color: rgba(151, 214, 232, .22);
+}
+.status {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(133, 218, 232, .24);
+  border-radius: 10px;
+  background: rgba(6, 24, 41, .84);
+  color: #c5edf2;
+}
+.status::before { background: #75e3da; }
+button { border-color: rgba(145, 202, 222, .24); background: rgba(11, 30, 48, .91); color: #d8eaf0; }
+button:not(:disabled):hover { background: rgba(37, 100, 120, .4); }
+button.active { background: linear-gradient(135deg, #91e9e5, #63bde0); }
+.overview-panel {
+  left: clamp(14px, 2vw, 28px);
+  top: 166px;
+  width: 268px;
+  padding: 17px;
+  border-top: 1px solid rgba(143, 238, 213, .55);
+}
+.overview-heading { font-size: 11px; }
+.overview-stat { min-height: 70px; padding: 12px; background: rgba(8, 28, 45, .7); }
+.overview-stat strong { font-size: 24px; }
+.overview-stat span { font-size: 10px; }
+.overview-row { font-size: 11px; }
+.overview-foot { color: #a8bfce; font-size: 10px; }
+.compass-hud { left: clamp(14px, 2vw, 28px); top: 104px; }
+.compass-ring { border-color: rgba(139, 232, 239, .55); background: rgba(9, 30, 48, .9); }
+.control-deck {
+  border-top: 1px solid rgba(132, 224, 232, .56);
+  padding: 16px 18px;
+}
+.control-label { color: #b5e8ee; letter-spacing: .12em; }
+.filters button, .tool-actions button { min-height: 38px; }
+.legend { color: #c6d9e1; }
+
+#globe-fallback {
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  gap: 0;
+  padding-top: 45px;
+  padding-bottom: 135px;
+  background: radial-gradient(ellipse 42% 44% at 50% 46%, rgba(33, 155, 189, .12), transparent 95%);
+}
+.fallback-eyebrow {
+  margin-bottom: 17px;
+  color: #9be3e6;
+  font: 600 10px 'JetBrains Mono', monospace;
+  letter-spacing: .23em;
+  text-shadow: 0 0 20px rgba(105, 235, 245, .25);
+}
+.fallback-eyebrow span { color: #83eebd; }
+.fallback-orb {
+  position: relative;
+  width: clamp(300px, min(39vw, 45vh), 520px);
+  aspect-ratio: 1;
+  background:
+    radial-gradient(circle at 29% 23%, rgba(202, 244, 255, .13), transparent 43%),
+    linear-gradient(105deg, transparent 43%, rgba(1, 9, 22, .55) 72%, rgba(1, 6, 16, .88) 97%),
+    url('https://unpkg.com/three-globe@2.43.0/example/img/earth-blue-marble.jpg') 38% center / auto 100%,
+    #124b68;
+  border: 1px solid rgba(140, 225, 249, .26);
+  box-shadow:
+    0 0 0 1px rgba(90, 217, 238, .15),
+    0 0 0 22px rgba(89, 206, 230, .028),
+    0 0 0 74px rgba(89, 206, 230, .018),
+    0 0 85px 20px rgba(35, 159, 198, .32),
+    inset -35px -32px 70px rgba(0, 6, 20, .58);
+}
+.fallback-orb::before {
+  content: '';
+  position: absolute;
+  inset: -17px;
+  border: 1px solid rgba(143, 225, 240, .23);
+  border-radius: 50%;
+  box-shadow: 0 0 18px rgba(93, 220, 239, .08);
+}
+.fallback-orb::after {
+  content: '';
+  position: absolute;
+  inset: -44px;
+  border: 1px dashed rgba(142, 206, 225, .19);
+  border-radius: 50%;
+}
+.fallback-message {
+  margin-top: 31px;
+  max-width: 480px;
+  color: #c0d9e4;
+  font: 12px/1.55 'Inter', sans-serif;
+}
+.fallback-message strong {
+  margin-bottom: 5px;
+  color: #ecfbff;
+  font-size: 16px;
+  font-weight: 600;
+}
+.fallback-message span { display: block; }
+
+/* Keep the information hierarchy usable on narrow screens. */
+@media (max-width: 900px) {
+  .overview-panel { top: 140px; left: 10px; width: min(235px, 34vw); }
+  .fallback-orb { width: min(47vw, 44vh); }
+  #globe-fallback { padding-bottom: 170px; }
+}
+@media (max-width: 768px) {
+  .brand { min-height: 47px; padding: 9px 13px; }
+  .brand strong { font-size: 13px; }
+  .topbar .tools { gap: 7px; }
+  .overview-panel { display: none; }
+  #globe-fallback { padding-top: 110px; padding-bottom: 198px; }
+  .fallback-orb { width: min(66vw, 39vh); min-width: 210px; }
+  .fallback-message { margin-top: 22px; max-width: min(75vw, 360px); font-size: 11px; }
+  .fallback-message strong { font-size: 14px; }
+  .fallback-eyebrow { font-size: 8px; letter-spacing: .1em; }
+  .control-deck { padding: 11px; }
+}
+@media (max-height: 650px) {
+  .fallback-orb { width: min(32vw, 40vh); }
+  #globe-fallback { padding-bottom: 80px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fallback-orb, .fallback-orb::before, .fallback-orb::after { animation: none; }
+}

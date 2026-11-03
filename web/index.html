@@ -994,12 +994,14 @@
         .weather-panel *, #google3d-toolbar * { animation: none !important; transition: none !important; }
       }
     </style>
+    <link rel="stylesheet" href="visual-refresh.css" />
   </head>
   <body>
     <div id="globe" aria-label="Globo 3D com dados simulados de localização"></div>
     <div id="globe-fallback" hidden role="status">
+      <div class="fallback-eyebrow">VISUALIZAÇÃO GLOBAL <span>•</span> MODO DEMONSTRAÇÃO</div>
       <div class="fallback-orb" aria-hidden="true"></div>
-      <div class="fallback-message"><strong>Globo 3D indisponível</strong>Confira a conexão e o suporte a WebGL do navegador e recarregue a página.</div>
+      <div class="fallback-message"><strong>Explore a Terra de outro ângulo.</strong><span>Prévia visual em 2D. O globo interativo requer WebGL no navegador.</span></div>
     </div>
     <div class="tactical-overlay" aria-hidden="true">
       <span class="tactical-corner tl"></span>

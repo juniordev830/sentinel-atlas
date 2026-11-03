@@ -43,8 +43,12 @@
       }
       #globe { position: fixed; inset: 0; }
       #map { position: fixed; inset: 0; display: none; }
+      #map-3d { position: fixed; inset: 0; display: none; background: #050811; }
+      #map-3d gmp-map-3d { display: block; width: 100%; height: 100%; }
       body.map-mode #globe { display: none; }
       body.map-mode #map { display: block; }
+      body.map-mode.google3d-mode #map { display: none; }
+      body.map-mode.google3d-mode #map-3d { display: block; }
       .hud {
         position: fixed;
         inset: 0;
@@ -597,7 +601,7 @@
       }
 
       /* Painel de operação: hierarquia mais clara sem cobrir o globo. */
-      #globe, #map { z-index: 0; }
+      #globe, #map, #map-3d { z-index: 0; }
       #globe::after {
         content: '';
         position: absolute;
@@ -649,6 +653,12 @@
       .overview-stat span { font-size: 10px; line-height: 1.4; }
       .overview-stat { border-color: rgba(103, 232, 249, .16); }
       .overview-foot { color: #a4b9ca; }
+      #google-3d-view[aria-pressed="true"] {
+        border-color: rgba(52, 211, 153, .9);
+        color: #d1fae5;
+        background: rgba(5, 150, 105, .2);
+      }
+      .solar-caption { color: #fcd34d; font: 500 10px 'JetBrains Mono', monospace; white-space: nowrap; }
       .render-quality-control {
         display: inline-flex;
         align-items: center;
@@ -882,6 +892,7 @@
         box-shadow: 0 20px 55px rgba(0, 0, 0, .55);
       }
       body.map-mode .google-places-panel { display: flex; }
+      body.map-mode.google3d-mode .google-places-panel { display: none; }
       body.map-mode.focus-mode .google-places-panel { display: none; }
       .google-places-panel h2 {
         margin: 0;
@@ -1100,6 +1111,8 @@
           <button id="rotation-toggle" aria-pressed="true" title="Controlar o giro automático do globo">⏸️ Pausar giro</button>
           <button id="reset-camera" title="Recentralizar o globo em uma visão global">🎯 Visão global</button>
           <button id="map-view" aria-pressed="false">🛰️ Mapa satélite</button>
+          <button id="google-3d-view" type="button" aria-pressed="false" title="Visão fotorrealista oficial do Google Maps; pode gerar custos de API">🏙️ Google 3D</button>
+          <span id="solar-status" class="solar-caption" title="Posição solar estimada pelo horário UTC">☀ Sol UTC · estimado</span>
           <button id="toggle-geoint" type="button" aria-expanded="false" aria-controls="geoint-panel">🌐 Fontes GeoINT</button>
           <button id="toggle-ai" style="border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,0.15);">🤖 Copiloto IA</button>
             </div>
@@ -1116,6 +1129,7 @@
       </div>
     </div>
     <div id="map" aria-label="Mapa Google com imagens de satélite e trânsito"></div>
+    <div id="map-3d" aria-label="Mapa Google 3D fotorrealista"></div>
     <script>
       // Modo de visualização imersiva: mantém a saída acessível pelo botão superior.
       const focusModeButton = document.getElementById('focus-mode');
@@ -1139,6 +1153,25 @@
       const compactLayout = window.matchMedia('(max-width: 900px)');
       overviewPanel.open = !compactLayout.matches;
       compactLayout.addEventListener?.('change', event => { overviewPanel.open = !event.matches; });
+
+      // Aproximação astronômica (NOAA) da posição subsolar em UTC;
+      // não são dados meteorológicos ou medições de satélite.
+      function estimateSubsolarPoint(date) {
+        const day = Math.floor((Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) -
+          Date.UTC(date.getUTCFullYear(), 0, 0)) / 86400000);
+        const minutes = date.getUTCHours() * 60 + date.getUTCMinutes() +
+          date.getUTCSeconds() / 60;
+        const gamma = (2 * Math.PI / 365) * (day - 1 + (minutes / 60 - 12) / 24);
+        const equationOfTime = 229.18 * (0.000075 + 0.001868 * Math.cos(gamma) -
+          0.032077 * Math.sin(gamma) - 0.014615 * Math.cos(2 * gamma) -
+          0.040849 * Math.sin(2 * gamma));
+        const declination = 0.006918 - 0.399912 * Math.cos(gamma) +
+          0.070257 * Math.sin(gamma) - 0.006758 * Math.cos(2 * gamma) +
+          0.000907 * Math.sin(2 * gamma) - 0.002697 * Math.cos(3 * gamma) +
+          0.00148 * Math.sin(3 * gamma);
+        const longitude = 180 - (minutes + equationOfTime) / 4;
+        return { lat: declination * 180 / Math.PI, lng: ((longitude + 540) % 360) - 180 };
+      }
 
       function initializeSentinel() {
       const assets = [
@@ -1198,6 +1231,7 @@
 
       const earthquakeSource = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson';
       let googleMap;
+      let googleMap3D;
       let googleMapsLoadPromise;
       let googlePlaceMarkers = [];
       let googlePlacesInfoWindow;
@@ -1371,26 +1405,48 @@
         .ringPropagationSpeed('propagationSpeed').ringRepeatPeriod('repeatPeriod')
         .pointsData(getFilteredPoints('all'));
 
-      // Iluminação cinematográfica simulada: não representa a incidência solar em tempo real.
+      // Iluminação solar dinâmica, aproximada com base na data/hora UTC.
       const globeMaterial = globe.globeMaterial();
       let cloudsMesh = null;
       if (window.THREE) {
         try {
-          const sun = new THREE.DirectionalLight(0xfff1d6, 1.55);
-          sun.position.set(-150, 75, 125);
-          const skyBounce = new THREE.AmbientLight(0x8fbedb, 0.55);
+          const sun = new THREE.DirectionalLight(0xfff0d8, 2.0);
+          const skyBounce = new THREE.AmbientLight(0x87aec6, 0.27);
           globe.lights?.([skyBounce, sun]);
+          function refreshSolarLight() {
+            const point = estimateSubsolarPoint(new Date());
+            const vector = globe.getCoords(point.lat, point.lng, 10);
+            sun.position.set(vector.x, vector.y, vector.z);
+            const label = document.getElementById('solar-status');
+            if (label) label.textContent = '☀ Sol UTC · ' +
+              point.lat.toFixed(1) + '°, ' + point.lng.toFixed(1) + '°';
+          }
+          refreshSolarLight();
+          setInterval(() => { if (!document.hidden) refreshSolarLight(); }, 60000);
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) refreshSolarLight();
+          });
           if (globeMaterial) {
-            globeMaterial.specular = new THREE.Color('#40667d');
-            globeMaterial.shininess = 28;
+            globeMaterial.specular = new THREE.Color('#9eb5c5');
+            globeMaterial.shininess = 35;
+            // Refletividade dos oceanos, sem forçar brilho nas massas de terra.
+            new THREE.TextureLoader().load(
+              'https://unpkg.com/three-globe@2.43.0/example/img/earth-water.png',
+              texture => {
+                globeMaterial.specularMap = texture;
+                globeMaterial.needsUpdate = true;
+              },
+              undefined,
+              () => console.info('Textura oceânica indisponível; globo segue funcional.')
+            );
           }
           const webglRenderer = globe.renderer?.();
           if (webglRenderer && THREE.ACESFilmicToneMapping !== undefined) {
             webglRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-            webglRenderer.toneMappingExposure = 1.25;
+            webglRenderer.toneMappingExposure = 1.05;
           }
         } catch (error) {
-          console.info('Iluminação avançada indisponível; usando iluminação padrão.', error);
+          console.info('Iluminação solar avançada indisponível; mantendo padrão.', error);
         }
       }
 

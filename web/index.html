@@ -945,6 +945,54 @@
       @media (max-height: 600px) {
         .google-places-panel { max-height: 44dvh; bottom: 8px; }
       }
+      /* Visualização meteorológica transparente: modelos e eventos identificados por fonte. */
+      .weather-panel {
+        position: fixed; z-index: 35; right: 18px; top: 94px;
+        width: min(365px, calc(100vw - 36px)); max-height: min(625px, 72dvh);
+        overflow: auto; pointer-events: auto; border-top: 2px solid #7dd3fc;
+      }
+      .weather-panel[hidden], body.focus-mode .weather-panel { display: none !important; }
+      .weather-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      .weather-header strong { font-size: 13px; color: #e0faff; }
+      .weather-header button, .weather-actions button { min-height: 40px; }
+      .weather-note, .weather-status { color: #b5c9d8; font-size: 11px; line-height: 1.5; margin: 8px 0; }
+      .weather-status { color: #7dd3fc; min-height: 24px; }
+      #weather-source, #camera-destination {
+        color: #e0faff; background: #0a1c30; border: 1px solid rgba(103,232,249,.45);
+        border-radius: 8px; padding: 8px; font: 500 11px 'JetBrains Mono',monospace;
+        max-width: 100%;
+      }
+      .weather-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      .weather-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 10px 0; }
+      .weather-metric {
+        padding: 10px; background: rgba(12,29,47,.88);
+        border: 1px solid rgba(125,211,252,.22); border-radius: 10px;
+      }
+      .weather-metric span { display: block; font-size: 10px; color: #a6bfd0; line-height: 1.5; }
+      .weather-metric strong { display: block; font: 600 16px 'JetBrains Mono',monospace; color: #e4faff; }
+      .weather-wind-arrow { display: inline-block; color: #7dd3fc; transform-origin: center; font-size: 18px; margin-left: 4px; }
+      .weather-events { padding-left: 18px; margin: 8px 0; color: #d7e9f0; font-size: 11px; }
+      .weather-events li { margin: 4px 0; }
+      .camera-control { display: inline-flex; align-items: center; gap: 6px; color: #b3d6e5; font-size: 10px; }
+      #camera-destination { min-height: 36px; }
+      #google3d-toolbar {
+        display: none; position: fixed; z-index: 11;
+        left: 50%; bottom: 175px; transform: translateX(-50%);
+        gap: 8px; align-items: center; padding: 10px;
+        border-radius: 12px; border: 1px solid rgba(125,211,252,.38);
+        background: rgba(4,15,29,.91); pointer-events: auto;
+        box-shadow: 0 12px 35px #0008;
+      }
+      body.map-mode.google3d-mode #google3d-toolbar { display: flex; }
+      body.focus-mode #google3d-toolbar { display: none; }
+      #google3d-toolbar button { min-height: 40px; white-space: nowrap; }
+      @media (max-width:900px) {
+        .weather-panel { left: 10px; right: 10px; top: 75px; width: auto; max-height: 50dvh; }
+        #google3d-toolbar { bottom: 160px; max-width: calc(100vw - 20px); overflow-x: auto; }
+      }
+      @media (prefers-reduced-motion:reduce) {
+        .weather-panel *, #google3d-toolbar * { animation: none !important; transition: none !important; }
+      }
     </style>
   </head>
   <body>
@@ -1008,6 +1056,29 @@
         </label>
         <div id="geoint-status" class="geoint-status" role="status" aria-live="polite">Fontes aguardando conexão com a API.</div>
         <div id="geoint-source-list" class="geoint-source-list"></div>
+      </section>
+      <section id="weather-panel" class="panel weather-panel" hidden aria-label="Dados meteorológicos e eventos naturais">
+        <div class="weather-header">
+          <strong>☁ Meteorologia &amp; eventos</strong>
+          <button id="weather-close" type="button" aria-label="Fechar meteorologia">✕</button>
+        </div>
+        <p class="weather-note">Consultas apenas por clique. Open-Meteo fornece valores modelados; NASA informa eventos catalogados. Nenhuma camada é radar ao vivo.</p>
+        <label class="weather-note" for="weather-source">Fonte geográfica
+          <select id="weather-source">
+            <option value="weather">Tempo · Open-Meteo (modelo)</option>
+            <option value="air_quality">Qualidade do ar · Open-Meteo (modelo)</option>
+            <option value="extreme_events">Eventos naturais · NASA EONET (global)</option>
+            <option value="wildfires">Focos de calor · NASA FIRMS (com chave)</option>
+          </select>
+        </label>
+        <div class="weather-actions">
+          <button id="weather-fetch" type="button">Consultar centro do globo</button>
+          <button id="weather-clear" type="button">Limpar dados</button>
+        </div>
+        <div id="weather-status" class="weather-status" role="status" aria-live="polite">Selecione uma fonte e consulte quando desejar.</div>
+        <div id="weather-metrics" class="weather-metrics" aria-label="Medições da fonte"></div>
+        <ol id="weather-events" class="weather-events" aria-label="Eventos catalogados"></ol>
+        <p class="weather-note">A posição consultada é a câmera do globo, não o GPS do visitante. Valores climáticos variam conforme atualização e cobertura do provedor.</p>
       </section>
       <section id="google-places-panel" class="panel google-places-panel" aria-label="Lugares próximos pelo Google Maps">
         <h2>Google Maps · Locais próximos</h2>
@@ -1111,7 +1182,18 @@
           <button id="rotation-toggle" aria-pressed="true" title="Controlar o giro automático do globo">⏸️ Pausar giro</button>
           <button id="reset-camera" title="Recentralizar o globo em uma visão global">🎯 Visão global</button>
           <button id="map-view" aria-pressed="false">🛰️ Mapa satélite</button>
+          <label class="camera-control" for="camera-destination">Destino
+            <select id="camera-destination" aria-label="Região para sobrevoo">
+              <option value="natal">Natal · RN</option>
+              <option value="recife">Recife · PE</option>
+              <option value="brasilia">Brasília · DF</option>
+              <option value="saopaulo">São Paulo · SP</option>
+              <option value="rio">Rio de Janeiro · RJ</option>
+            </select>
+          </label>
+          <button id="camera-go" type="button" title="Sobrevoar o destino escolhido no globo">✈ Sobrevoar</button>
           <button id="google-3d-view" type="button" aria-pressed="false" title="Visão fotorrealista oficial do Google Maps; pode gerar custos de API">🏙️ Google 3D</button>
+          <button id="weather-toggle" type="button" aria-expanded="false" aria-controls="weather-panel">☁ Meteorologia</button>
           <span id="solar-status" class="solar-caption" title="Posição solar estimada pelo horário UTC">☀ Sol UTC · estimado</span>
           <button id="toggle-geoint" type="button" aria-expanded="false" aria-controls="geoint-panel">🌐 Fontes GeoINT</button>
           <button id="toggle-ai" style="border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,0.15);">🤖 Copiloto IA</button>
@@ -1130,6 +1212,11 @@
     </div>
     <div id="map" aria-label="Mapa Google com imagens de satélite e trânsito"></div>
     <div id="map-3d" aria-label="Mapa Google 3D fotorrealista"></div>
+    <div id="google3d-toolbar" role="group" aria-label="Navegação no Google 3D">
+      <button type="button" id="google3d-zoom-in" title="Aproximar a câmera Google 3D">＋ Aproximar</button>
+      <button type="button" id="google3d-zoom-out" title="Afastar a câmera Google 3D">－ Afastar</button>
+      <button type="button" id="google3d-rotate" title="Girar a câmera Google 3D">↻ Girar</button>
+    </div>
     <script>
       // Modo de visualização imersiva: mantém a saída acessível pelo botão superior.
       const focusModeButton = document.getElementById('focus-mode');

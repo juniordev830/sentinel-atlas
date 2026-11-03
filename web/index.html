@@ -821,6 +821,50 @@
         }
       }
 
+      /* Fontes GeoINT: catálogo compacto com ações explícitas, nunca varredura automática. */
+      .geoint-sources-panel {
+        position: fixed;
+        z-index: 31;
+        top: 94px;
+        left: 18px;
+        width: min(380px, calc(100vw - 36px));
+        max-height: min(570px, calc(100dvh - 220px));
+        overflow-y: auto;
+        padding: 14px;
+        pointer-events: auto;
+        border-top: 2px solid #67e8f9;
+      }
+      .geoint-sources-panel[hidden] { display: none !important; }
+      body.focus-mode .geoint-sources-panel { display: none; }
+      .geoint-panel-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      .geoint-panel-header strong { color: #e5faff; font-size: 13px; }
+      .geoint-panel-header button { min-height: 36px; }
+      .geoint-note, .geoint-status { color: #b3cad9; font-size: 11px; line-height: 1.5; }
+      .geoint-status { color: #67e8f9; }
+      .geoint-source-list { display: grid; gap: 8px; margin: 10px 0 0; }
+      .geoint-source {
+        border: 1px solid rgba(103, 232, 249, .17);
+        border-radius: 10px;
+        background: rgba(7, 18, 34, .72);
+        padding: 10px;
+        display: grid;
+        gap: 6px;
+      }
+      .geoint-source-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .geoint-source-heading strong { color: #e2faff; font-size: 12px; }
+      .geoint-source-heading small { color: #9fbbc9; font-size: 10px; }
+      .geoint-source p { margin: 0; color: #9db6c7; font-size: 11px; line-height: 1.45; }
+      .geoint-source button { min-height: 36px; justify-self: start; }
+      .geoint-source button:focus-visible, #geoint-uf:focus-visible {
+        outline: 2px solid #67e8f9; outline-offset: 2px;
+      }
+      .geoint-source .geoint-results { padding-left: 18px; margin: 0; color: #d9eef6; font-size: 11px; }
+      .geoint-source .geoint-results li { margin: 3px 0; }
+      .geoint-source a { color: #67e8f9; font-size: 11px; }
+      #geoint-uf { color: #e2faff; background: #0a1c30; border: 1px solid rgba(103,232,249,.45); border-radius: 8px; padding: 8px; }
+      @media (max-width: 900px) {
+        .geoint-sources-panel { left: 10px; right: 10px; width: auto; top: 75px; max-height: 47dvh; }
+      }
       /* Dados do Google aparecem somente sobre o mapa licenciado do Google. */
       .google-places-panel {
         display: none;
@@ -926,6 +970,34 @@
         </div>
       </div>
 
+      <section id="geoint-panel" class="panel geoint-sources-panel" hidden aria-label="Catálogo de fontes geoespaciais">
+        <div class="geoint-panel-header">
+          <strong>🌍 Fontes GeoINT · 16 categorias</strong>
+          <button id="geoint-close" type="button" aria-label="Fechar fontes">✕</button>
+        </div>
+        <p class="geoint-note">Consulte uma fonte de cada vez, com o centro atual do globo como referência. Não são dados de vigilância pessoal.</p>
+        <label for="geoint-uf" class="geoint-note">UF para consulta de municípios IBGE:
+          <select id="geoint-uf">
+            <option value="">Escolha o estado</option>
+            <option value="AC">AC</option><option value="AL">AL</option>
+            <option value="AP">AP</option><option value="AM">AM</option>
+            <option value="BA">BA</option><option value="CE">CE</option>
+            <option value="DF">DF</option><option value="ES">ES</option>
+            <option value="GO">GO</option><option value="MA">MA</option>
+            <option value="MT">MT</option><option value="MS">MS</option>
+            <option value="MG">MG</option><option value="PA">PA</option>
+            <option value="PB">PB</option><option value="PR">PR</option>
+            <option value="PE">PE</option><option value="PI">PI</option>
+            <option value="RJ">RJ</option><option value="RN">RN</option>
+            <option value="RS">RS</option><option value="RO">RO</option>
+            <option value="RR">RR</option><option value="SC">SC</option>
+            <option value="SP">SP</option><option value="SE">SE</option>
+            <option value="TO">TO</option>
+          </select>
+        </label>
+        <div id="geoint-status" class="geoint-status" role="status" aria-live="polite">Fontes aguardando conexão com a API.</div>
+        <div id="geoint-source-list" class="geoint-source-list"></div>
+      </section>
       <section id="google-places-panel" class="panel google-places-panel" aria-label="Lugares próximos pelo Google Maps">
         <h2>Google Maps · Locais próximos</h2>
         <p>Selecione uma categoria e consulte o entorno do centro do mapa. Consultas podem gerar custos na sua conta Google Cloud.</p>
@@ -964,7 +1036,7 @@
         <div class="overview-grid">
           <div class="overview-stat"><span>Itens no painel</span><strong id="overview-assets">--</strong></div>
           <div class="overview-stat"><span>Geofences</span><strong id="overview-geofences" class="green">--</strong></div>
-          <div class="overview-stat"><span>Camadas</span><strong>06</strong></div>
+          <div class="overview-stat"><span>Categorias GeoINT</span><strong>16</strong></div>
           <div class="overview-stat"><span>API</span><strong id="overview-api" aria-live="polite">--</strong></div>
         </div>
         <div class="overview-divider"></div>
@@ -1028,6 +1100,7 @@
           <button id="rotation-toggle" aria-pressed="true" title="Controlar o giro automático do globo">⏸️ Pausar giro</button>
           <button id="reset-camera" title="Recentralizar o globo em uma visão global">🎯 Visão global</button>
           <button id="map-view" aria-pressed="false">🛰️ Mapa satélite</button>
+          <button id="toggle-geoint" type="button" aria-expanded="false" aria-controls="geoint-panel">🌐 Fontes GeoINT</button>
           <button id="toggle-ai" style="border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,0.15);">🤖 Copiloto IA</button>
             </div>
           </div>
@@ -1943,6 +2016,161 @@
       });
       }
 
+
+      const geointPanel = document.getElementById('geoint-panel');
+      const geointToggle = document.getElementById('toggle-geoint');
+      const geointStatus = document.getElementById('geoint-status');
+      const geointList = document.getElementById('geoint-source-list');
+      let geointCatalog = [];
+
+      function setGeointPanel(enabled) {
+        geointPanel.hidden = !enabled;
+        geointToggle.setAttribute('aria-expanded', String(enabled));
+      }
+      geointToggle.addEventListener('click', () => {
+        setGeointPanel(geointPanel.hidden);
+        if (!geointPanel.hidden && !geointCatalog.length) loadGeointCatalog();
+      });
+      document.getElementById('geoint-close').addEventListener('click', () => setGeointPanel(false));
+
+      const geointColors = {
+        earthquakes: '#fb923c', wildfires: '#ef4444', extreme_events: '#f43f5e',
+        aircraft: '#38bdf8', orbital: '#c084fc', vessels: '#34d399',
+        weather: '#7dd3fc', air_quality: '#facc15', urban: '#86efac',
+        terrain: '#d8b4fe', transit: '#4ade80', hydrology: '#22d3ee',
+        alerts: '#f87171'
+      };
+      const geointLabel = {
+        ready: 'Pronto para consulta', needs_region: 'Selecione uma UF',
+        requires_configuration: 'Configuração necessária', external_view: 'Visualização externa',
+        ok: 'Dados consultados', empty: 'Sem dados retornados', unavailable: 'Fonte indisponível'
+      };
+
+      function safeGeointExternalLink(url) {
+        try {
+          const link = new URL(url);
+          return link.protocol === 'https:' &&
+            link.hostname === 'worldview.earthdata.nasa.gov' ? link.href : null;
+        } catch { return null; }
+      }
+
+      async function queryGeointLayer(layer, row, button, output) {
+        if (layer.id === 'traffic') {
+          if (!document.body.classList.contains('map-mode')) document.getElementById('map-view').click();
+          output.textContent = 'Trânsito: camada Google Maps. Depende da chave configurada.';
+          return;
+        }
+        if (layer.id === 'imagery') {
+          const link = safeGeointExternalLink('https://worldview.earthdata.nasa.gov/');
+          const a = document.createElement('a');
+          a.href = link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+          a.textContent = 'Abrir imagens NASA Worldview';
+          output.replaceChildren(a);
+          return;
+        }
+        if (layer.status === 'requires_configuration') {
+          output.textContent = 'Falta configurar ' + layer.requirement + ' no servidor. Não coloque chaves no navegador.';
+          return;
+        }
+        const uf = document.getElementById('geoint-uf').value;
+        if (layer.id === 'municipalities' && !uf) {
+          output.textContent = 'Selecione uma UF acima para consultar o IBGE.';
+          return;
+        }
+        button.disabled = true;
+        output.textContent = 'Consultando ' + layer.provider + '…';
+        try {
+          const camera = globe.pointOfView() || {lat: 0, lng: -30};
+          const params = new URLSearchParams({lat: String(camera.lat ?? 0), lng: String(camera.lng ?? -30)});
+          if (layer.id === 'municipalities') params.set('uf', uf);
+          const res = await fetch('/api/geoint/layers/' + encodeURIComponent(layer.id) + '?' + params, {
+            headers: {Accept: 'application/json'}
+          });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          const items = Array.isArray(data.items) ? data.items : [];
+          const latest = data.status === 'ok' ? 'Dados obtidos' :
+            (geointLabel[data.status] || 'Sem dados disponíveis');
+          output.replaceChildren();
+          const intro = document.createElement('p');
+          intro.textContent = latest + ' · ' + items.length + ' item(ns) · ' + layer.provider +
+            (data.cached ? ' · cache' : '');
+          output.append(intro);
+          if (data.error) {
+            const err = document.createElement('p');
+            err.textContent = data.error;
+            output.append(err);
+          }
+          if (data.status === 'ok' || data.status === 'empty') {
+            const type = 'geoint-' + layer.id;
+            // Não misturar as fontes oficiais com itens demonstrativos do mesmo tipo.
+            const points = items.filter(item => typeof item.lat === 'number' && typeof item.lng === 'number')
+              .map(item => ({
+                id: String(item.id), type,
+                lat: item.lat, lng: item.lng, altitude: 0.035,
+                label: String(item.title) + ' · ' + String(item.detail || layer.provider) +
+                  ' [' + String(item.data_kind || layer.data_kind) + ']',
+                color: geointColors[layer.id] || '#67e8f9'
+              }));
+            replaceAssets(type, points);
+            if (points.length) document.querySelector('[data-layer="all"]')?.click();
+          }
+          if (items.length) {
+            const list = document.createElement('ol');
+            list.className = 'geoint-results';
+            items.slice(0, 8).forEach(item => {
+              const entry = document.createElement('li');
+              entry.textContent = String(item.title) + (item.detail ? ' · ' + String(item.detail) : '');
+              list.append(entry);
+            });
+            output.append(list);
+          }
+          geointStatus.textContent = 'Consulta: ' + layer.name + ' · ' + latest +
+            ' · ' + new Date().toLocaleTimeString('pt-BR');
+        } catch (error) {
+          output.textContent = 'Não foi possível consultar esta fonte. Confira o servidor e tente novamente.';
+        } finally { button.disabled = false; }
+      }
+
+      async function loadGeointCatalog() {
+        geointStatus.textContent = 'Consultando o catálogo, sem carregar dados externos…';
+        try {
+          const res = await fetch('/api/geoint/layers', {headers: {Accept: 'application/json'}});
+          if (!res.ok) throw new Error('API indisponível');
+          const payload = await res.json();
+          if (!Array.isArray(payload.layers) || payload.layers.length !== 16) {
+            throw new Error('Catálogo incompleto');
+          }
+          geointCatalog = payload.layers;
+          geointList.replaceChildren();
+          for (const layer of geointCatalog) {
+            const row = document.createElement('section');
+            row.className = 'geoint-source';
+            const heading = document.createElement('div');
+            heading.className = 'geoint-source-heading';
+            const name = document.createElement('strong');
+            name.textContent = layer.name;
+            const label = document.createElement('small');
+            label.textContent = geointLabel[layer.status] || layer.status;
+            heading.append(name, label);
+            const desc = document.createElement('p');
+            desc.textContent = layer.provider + ' · ' + layer.description;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = layer.id === 'traffic' ? 'Abrir Google Maps' :
+              layer.id === 'imagery' ? 'Abrir NASA Worldview' : 'Consultar';
+            const output = document.createElement('div');
+            output.className = 'geoint-note';
+            button.addEventListener('click', () => queryGeointLayer(layer, row, button, output));
+            row.append(heading, desc, button, output);
+            geointList.append(row);
+          }
+          geointStatus.textContent = '16 categorias cadastradas · busca manual e status por fonte';
+        } catch {
+          geointStatus.textContent = 'Catálogo indisponível. Inicie a API FastAPI para carregar as fontes.';
+        }
+      }
+      
       function setGlobeControlsEnabled(enabled) {
         document.querySelectorAll('[data-layer], .tool-actions button, #asset-search')
           .forEach(element => { element.disabled = !enabled; });

@@ -224,7 +224,7 @@ test('recentralizar retorna ao globo e fecha o inspetor', () => {
     setMapView(value) { mapEnabled = value; }
   };
   vm.runInNewContext(
-    snippet('function resetGlobalView()', '// Atualiza bússola'), context
+    snippet('function resetGlobalView()', '// Coordenadas estáticas de atalhos'), context
   );
   button.click();
   assert.equal(mapEnabled, false);
@@ -613,7 +613,7 @@ test('visualização 3D Google só inicializa após clique, preservando mapa lic
     console
   };
   vm.runInNewContext(
-    snippet('async function openGoogle3DMap()', 'function setMapView(enabled)'),
+    snippet('async function openGoogle3DMap()', 'function adjustGoogle3DCamera(action)'),
     context
   );
   assert.equal(created.length, 0, 'não gera consultas na abertura do aplicativo');
@@ -647,7 +647,7 @@ test('Google 3D exige chave e não faz renderização Google sem credenciais', a
     console
   };
   vm.runInNewContext(
-    snippet('async function openGoogle3DMap()', 'function setMapView(enabled)'),
+    snippet('async function openGoogle3DMap()', 'function adjustGoogle3DCamera(action)'),
     context
   );
   await context.openGoogle3DMap();

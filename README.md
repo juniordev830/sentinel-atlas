@@ -60,6 +60,78 @@ O painel **God's Eye View** oferece um mapa 2D com imagens de satélite e nomes 
 - Para distribuição pública, mantenha uma política de privacidade e termos de uso adequados às regras do Google Maps Platform.
 - Consulte a [documentação oficial da Maps JavaScript API](https://developers.google.com/maps/documentation/javascript/get-api-key), [Nearby Search (New)](https://developers.google.com/maps/documentation/javascript/nearby-search) e as [políticas de atribuição do Places](https://developers.google.com/maps/documentation/places/web-service/policies).
 
+## GeoINT: 16 categorias de fontes públicas
+
+No painel web, clique em **🌐 Fontes GeoINT**. O catálogo lista 16 tipos de dados, indicando
+**pronto para consulta**, **configuração necessária**, **visualização externa** ou **selecione uma UF**.
+Uma consulta ocorre **somente quando você clica** em uma fonte; não existe coleta massiva
+ou renovação automática com custo. A seleção de lugar usa as coordenadas do centro do globo.
+
+| Categoria | Provedor | Implementação e condições |
+|---|---|---|
+| Imagens da Terra | NASA Worldview/GIBS | Abre o visualizador externo oficial; não oferece filmagem orbital ao vivo |
+| Aeronaves | OpenSky | API de estados com recorte geográfico (±1°); pode limitar, bloquear ou não cobrir a área |
+| Navios e portos | Global Fishing Watch | Eventos portuários históricos; requer `GFW_API_TOKEN` e respeitar uso não comercial |
+| Focos de calor | NASA FIRMS | CSV VIIRS SNPP NRT por área (±1°), requer `FIRMS_MAP_KEY` e uso nos termos do serviço |
+| Terremotos | USGS | GeoJSON de eventos do dia, atualizado periodicamente |
+| Tempo | Open-Meteo | Consulta do modelo meteorológico atual; não é leitura de termômetro local |
+| Eventos naturais | NASA EONET | Eventos abertos registrados, cobertura variável |
+| Satélites orbitais | CelesTrak + SGP4 | Posição estimada da ISS a partir de elementos orbitais; não é observação física ao vivo |
+| Edificações e POIs | OpenStreetMap/Overpass | Objetos mapeados em um raio de 700 m; cobertura comunitária e limites de acesso |
+| Trânsito | Google Maps | Camada licenciada no mapa oficial; exige chave, não fornece dados brutos de veículos |
+| Transporte público | Feed GeoJSON de operador regional | Exige `SENTINEL_TRANSIT_GEOJSON_URL`; não converte GTFS-Realtime protobuf automaticamente |
+| Hidrologia | Feed GeoJSON oficial/regional, como dados ANA | Exige `SENTINEL_HYDRO_GEOJSON_URL` |
+| Qualidade do ar | Open-Meteo | Indicadores PM2.5, PM10 e AQI **modelados**, não dados de sensores locais |
+| Municípios do Brasil | IBGE | Selecione uma UF, veja nomes e códigos oficiais; o cadastro não traz coordenadas individuais |
+| Elevação | Copernicus DEM via Open-Meteo | Altitude modelada em metros (resolução aproximada de 90 m) |
+| Alertas públicos | Feed GeoJSON governamental regional | Exige `SENTINEL_ALERTS_GEOJSON_URL` e licença compatível |
+
+As 16 categorias estão **presentes no painel e na API**, mas isso **não significa que todas
+já estejam fornecendo posições ao vivo**. Fontes opcionais e regionais continuam desativadas
+até que credenciais ou endpoints legítimos sejam configurados.
+
+**Rotas (autenticadas quando SENTINEL_API_TOKEN está configurado):**
+
+```http
+GET /api/geoint/layers
+GET /api/geoint/layers/weather?lat=-5.79&lng=-35.21
+GET /api/geoint/layers/earthquakes?lat=-5.79&lng=-35.21
+GET /api/geoint/layers/municipalities?lat=-5.79&lng=-35.21&uf=RN
+```
+
+Os retornos incluem `provider`, `status`, `data_kind`, `items`, `count`,
+`fetched_at`, `cached` quando aplicável, e `requirement` quando a configuração falta.
+As falhas são apresentadas como indisponíveis, nunca preenchidas com pontos fictícios.
+Os pontos reais têm identificadores com `type=geoint-<fonte>` e podem ser filtrados,
+diferentemente dos marcadores de demonstração existentes.
+
+**Configuração local opcional (não comite segredos):**
+
+```dotenv
+FIRMS_MAP_KEY=
+GFW_API_TOKEN=
+SENTINEL_TRANSIT_GEOJSON_URL=
+SENTINEL_HYDRO_GEOJSON_URL=
+SENTINEL_ALERTS_GEOJSON_URL=
+```
+
+Os URLs regionais devem ser endereços HTTPS configurados pelo operador da instalação,
+de fontes autorizadas a publicar GeoJSON `FeatureCollection` com geometria `Point`
+e propriedades como `name`, `description` e `time`. Formatos GTFS, CSV hidrológico
+e alertas CAP/XML precisam ser convertidos por um conector próprio antes dessa integração.
+
+**Desempenho e privacidade:** respostas são limitadas a 1,5 MB, com até 75 itens
+por consulta (menor em algumas fontes), timeout de oito segundos e cache de memória
+de cinco minutos. Não existe armazenamento persistente de fontes terceiras ou
+captura silenciosa da geolocalização do visitante. A posição usada nas consultas é
+a câmera do globo, não a posição GPS do aparelho.
+
+**Atribuições e direitos:** os dados têm licenças, cotas e regras distintas. Open-Meteo
+requer atribuição ao provedor e bases associadas; cartografia OSM requer crédito
+© OpenStreetMap contributors. Global Fishing Watch exige token e uso não comercial.
+Google Maps/Places permanece no mapa oficial licenciado. Avalie os termos individuais
+antes de comercializar ou redistribuir dados.
+
 ## Arquitetura
 
 | Componente | Responsabilidade |

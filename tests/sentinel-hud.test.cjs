@@ -642,6 +642,7 @@ test('Google 3D exige chave e não faz renderização Google sem credenciais', a
       google_maps_enabled: false, google_maps_api_key: null
     }) }),
     loadGoogleMaps: async () => { loads++; },
+    googleMap: undefined,
     setMapView(value) { classes.toggle('map-mode', value); },
     console
   };

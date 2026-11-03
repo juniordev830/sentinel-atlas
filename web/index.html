@@ -2014,8 +2014,6 @@
           openSatelliteMap();
         }
       });
-      }
-
 
       const geointPanel = document.getElementById('geoint-panel');
       const geointToggle = document.getElementById('toggle-geoint');
@@ -2170,7 +2168,8 @@
           geointStatus.textContent = 'Catálogo indisponível. Inicie a API FastAPI para carregar as fontes.';
         }
       }
-      
+      }
+
       function setGlobeControlsEnabled(enabled) {
         document.querySelectorAll('[data-layer], .tool-actions button, #asset-search')
           .forEach(element => { element.disabled = !enabled; });

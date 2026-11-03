@@ -491,7 +491,7 @@ test('fontes GeoINT não transformam conteúdo remoto em HTML executável', () =
   assert.match(code, /entry\.textContent = String\(item\.title\)/);
   assert.match(code, /output\.replaceChildren\(\)/);
   assert.match(code, /typeof item\.lat === 'number'/);
-  assert.match(code, /type: 'geoint-' \+ layer\.id/);
+  assert.match(code, /const type = 'geoint-' \+ layer\.id;/);
   assert.doesNotMatch(code, /innerHTML/);
   assert.doesNotMatch(code, /eval\(/);
 });

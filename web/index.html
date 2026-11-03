@@ -2099,11 +2099,14 @@
             err.textContent = data.error;
             output.append(err);
           }
+          const type = 'geoint-' + layer.id;
           if (data.status === 'ok' || data.status === 'empty') {
-            const type = 'geoint-' + layer.id;
             // Não misturar as fontes oficiais com itens demonstrativos do mesmo tipo.
-            const points = items.filter(item => typeof item.lat === 'number' && typeof item.lng === 'number')
-              .map(item => ({
+            // Rejeitar coordenadas inválidas, mesmo que a API esteja mal configurada.
+            const points = items.filter(item =>
+              typeof item.lat === 'number' && Number.isFinite(item.lat) && Math.abs(item.lat) <= 90 &&
+              typeof item.lng === 'number' && Number.isFinite(item.lng) && Math.abs(item.lng) <= 180
+            ).map(item => ({
                 id: String(item.id), type,
                 lat: item.lat, lng: item.lng, altitude: 0.035,
                 label: String(item.title) + ' · ' + String(item.detail || layer.provider) +
@@ -2112,6 +2115,9 @@
               }));
             replaceAssets(type, points);
             if (points.length) document.querySelector('[data-layer="all"]')?.click();
+          } else {
+            // Não deixar marcadores antigos parecerem uma consulta válida e atual.
+            replaceAssets(type, []);
           }
           if (items.length) {
             const list = document.createElement('ol');
@@ -2126,7 +2132,10 @@
           geointStatus.textContent = 'Consulta: ' + layer.name + ' · ' + latest +
             ' · ' + new Date().toLocaleTimeString('pt-BR');
         } catch (error) {
-          output.textContent = 'Não foi possível consultar esta fonte. Confira o servidor e tente novamente.';
+          replaceAssets('geoint-' + layer.id, []);
+          output.textContent = 'Não foi possível consultar esta fonte. Marcadores anteriores removidos; tente novamente.';
+          geointStatus.textContent = 'Consulta: ' + layer.name + ' · falhou · ' +
+            new Date().toLocaleTimeString('pt-BR');
         } finally { button.disabled = false; }
       }
 

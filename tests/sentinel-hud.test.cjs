@@ -665,3 +665,131 @@ test('Google 3D preserva rótulos do Google e mantém Places só no mapa 2D', ()
   assert.match(html, /google\.maps\.importLibrary\('maps3d'\)/);
   assert.doesNotMatch(html, /localStorage\.setItem\(['"]google-3d/);
 });
+
+
+test('sobrevoo usa destinos conhecidos e duração reduzida quando solicitado', () => {
+  const calls = [];
+  const controls = {
+    'camera-destination': { value: 'natal' },
+    'camera-go': { addEventListener(event, callback) { this[event] = callback; } },
+    'api-status': { textContent: '' }
+  };
+  const context = {
+    document: { getElementById: id => controls[id] },
+    motionPreference: { matches: true },
+    globe: { pointOfView: (point, duration) => calls.push({ point, duration }) },
+    setMapView(enabled) { assert.equal(enabled, false); }
+  };
+  vm.runInNewContext(
+    snippet('const cameraDestinations = Object.freeze(', '// Atualiza bússola e coordenadas HUD'),
+    context
+  );
+  assert.equal(context.flyToDestination('natal'), true);
+  assert.equal(calls[0].duration, 0);
+  assert.ok(Math.abs(calls[0].point.lat - (-5.7945)) < 0.001);
+  assert.equal(context.flyToDestination('../unknown'), false);
+  assert.equal(calls.length, 1, 'não deve sobrevoar um destino desconhecido');
+  controls['camera-destination'].value = 'recife';
+  controls['camera-go'].click();
+  assert.equal(calls.length, 2);
+  assert.match(controls['api-status'].textContent, /Recife/);
+});
+
+test('Google 3D possui câmera limitada e evita ações fora do modo 3D', () => {
+  const classes = classList(['google3d-mode']);
+  const buttons = {};
+  for (const id of ['google3d-zoom-in', 'google3d-zoom-out', 'google3d-rotate']) {
+    buttons[id] = { addEventListener(event, handler) { this[event] = handler; } };
+  }
+  const status = { textContent: '' };
+  const map = { range: 6500, heading: 0 };
+  const context = {
+    googleMap3D: map,
+    document: {
+      body: { classList: classes },
+      getElementById: id => id === 'api-status' ? status : buttons[id]
+    }
+  };
+  vm.runInNewContext(snippet('function adjustGoogle3DCamera(action)', 'function setMapView(enabled)'), context);
+  buttons['google3d-zoom-in'].click();
+  assert.ok(map.range < 6500);
+  buttons['google3d-rotate'].click();
+  assert.equal(map.heading, 45);
+  for (let i = 0; i < 40; i++) context.adjustGoogle3DCamera('zoom-in');
+  assert.equal(map.range, 300);
+  for (let i = 0; i < 40; i++) context.adjustGoogle3DCamera('zoom-out');
+  assert.equal(map.range, 35000);
+  classes.remove('google3d-mode');
+  assert.equal(context.adjustGoogle3DCamera('rotate'), false);
+  assert.equal(map.heading, 45);
+});
+
+test('painel meteorológico identifica modelos, dados de fonte e exige clique', () => {
+  assert.match(html, /id="weather-panel"[^>]*hidden/);
+  assert.match(html, /id="weather-source"/);
+  assert.match(html, /id="weather-fetch"/);
+  assert.match(html, /weatherFetch\.addEventListener\('click', queryWeatherVisualLayer\)/);
+  assert.match(html, /weatherSource\.addEventListener\('change', clearWeatherVisuals\)/);
+  assert.match(html, /'#?geoint-' \+ source/);
+  const query = snippet('async function queryWeatherVisualLayer()', "weatherToggle.addEventListener('click'");
+  assert.doesNotMatch(query, /innerHTML|localStorage|setInterval/);
+  assert.match(query, /'modelo'/);
+  assert.match(query, /'eventos catalogados globais'/);
+  assert.match(query, /Number\.isFinite\(item\.lat\)/);
+});
+
+test('meteorologia exibe somente medições numéricas válidas', () => {
+  const value = vm.runInNewContext(
+    snippet('function formatWeatherMeasurement(value', 'function renderWeatherMeasurements(item)') +
+      '\nformatWeatherMeasurement',
+    {}
+  );
+  assert.equal(value(Number.NaN, ' °C'), 'Não informado');
+  assert.equal(value(Infinity, ' °C'), 'Não informado');
+  assert.equal(value(null, ' °C'), 'Não informado');
+  assert.match(value(25.5, ' °C'), /25,5 °C|25\.5 °C/);
+});
+
+test('consulta meteorológica usa endpoint permitido e remove marcadores se a fonte cair', async () => {
+  const updates = [];
+  const point = { id: 'weather', title: 'Tempo modelado', lat: -5.8, lng: -35.2,
+    detail: '26 °C', measurements: { temperature_c: 26 }, timestamp: '2026-11-02T12:00' };
+  let unavailable = false;
+  const ctx = {
+    weatherSource: { value: 'weather' },
+    weatherSources: new Set(['weather', 'air_quality', 'extreme_events', 'wildfires']),
+    weatherSequence: 0, weatherFetch: { disabled: false }, weatherLastLayer: null,
+    weatherMetrics: { replaceChildren() {} }, weatherEvents: { replaceChildren() {}, append() {} },
+    weatherStatus: { textContent: '' },
+    globe: { pointOfView: () => ({ lat: -5.8, lng: -35.2 }) },
+    URLSearchParams,
+    geointColors: { weather: '#7dd3fc' },
+    document: { querySelector: () => ({ click() {} }), createElement: () => ({}) },
+    renderWeatherMeasurements(item) { this.lastRendered = item; },
+    replaceAssets(type, items) { updates.push({ type, size: items.length }); },
+    async fetch(url) {
+      assert.match(url, /^\/api\/geoint\/layers\/weather\?lat=/);
+      return { ok: true, json: async () => unavailable
+        ? { status: 'unavailable', items: [] }
+        : { status: 'ok', provider: 'Open-Meteo', items: [point] } };
+    }
+  };
+  vm.runInNewContext(snippet('async function queryWeatherVisualLayer()', "weatherToggle.addEventListener('click'"), ctx);
+  await ctx.queryWeatherVisualLayer();
+  assert.deepEqual(updates[0], { type: 'geoint-weather', size: 1 });
+  assert.equal(ctx.weatherFetch.disabled, false);
+  assert.match(ctx.weatherStatus.textContent, /modelo/);
+  unavailable = true;
+  await ctx.queryWeatherVisualLayer();
+  assert.deepEqual(updates[1], { type: 'geoint-weather', size: 0 });
+  assert.match(ctx.weatherStatus.textContent, /indisponível/);
+});
+
+test('shader de cidades só ativa sobre o lado noturno e respeita perfil econômico', () => {
+  assert.match(html, /function loadCityLights\(\)/);
+  assert.match(html, /1\.0 - smoothstep\(-0\.2, 0\.25, sunlight\)/);
+  assert.match(html, /THREE\.AdditiveBlending/);
+  assert.match(html, /profile\.mode !== 'eco' && currentTexture === 'day'/);
+  assert.match(html, /cityLightsMesh\.material\.uniforms\.sunVector\.value\.copy\(sun\.position\)\.normalize\(\)/);
+  assert.doesNotMatch(snippet('function loadCityLights()', '// Nuvens independentes'), /maps\.googleapis\.com/);
+});

@@ -473,3 +473,40 @@ test('Google Places exige clique explícito e mantém dados no mapa Google', () 
   assert.match(html, /mapTypeId: 'hybrid'/);
   assert.doesNotMatch(html, /localStorage\.setItem\(['"]google-places/i);
 });
+
+test('painel GeoINT expõe 16 categorias sem consultas automáticas', () => {
+  assert.match(html, /id="geoint-panel"[^>]*hidden/);
+  assert.match(html, /id="toggle-geoint"/);
+  assert.match(html, /id="geoint-uf"/);
+  assert.match(html, /id="geoint-source-list"/);
+  assert.match(html, /geointCatalog\.length !== 16/);
+  assert.match(html, /\/api\/geoint\/layers'/);
+  assert.match(html, /queryGeointLayer\(layer, row, button, output\)/);
+  assert.match(html, /button\.addEventListener\('click', \(\) => queryGeointLayer/);
+  assert.doesNotMatch(html, /setInterval\(queryGeointLayer/);
+});
+
+test('fontes GeoINT não transformam conteúdo remoto em HTML executável', () => {
+  const code = snippet('async function queryGeointLayer(', 'async function loadGeointCatalog()');
+  assert.match(code, /entry\.textContent = String\(item\.title\)/);
+  assert.match(code, /output\.replaceChildren\(\)/);
+  assert.match(code, /typeof item\.lat === 'number'/);
+  assert.match(code, /type: 'geoint-' \+ layer\.id/);
+  assert.doesNotMatch(code, /innerHTML/);
+  assert.doesNotMatch(code, /eval\(/);
+});
+
+test('GeoINT só abre links HTTPS de NASA Worldview', () => {
+  const context = { URL };
+  vm.runInNewContext(
+    snippet('function safeGeointExternalLink(url)', 'async function queryGeointLayer('),
+    context
+  );
+  assert.equal(
+    context.safeGeointExternalLink('https://worldview.earthdata.nasa.gov/'),
+    'https://worldview.earthdata.nasa.gov/'
+  );
+  assert.equal(context.safeGeointExternalLink('https://evil.example/map'), null);
+  assert.equal(context.safeGeointExternalLink('http://worldview.earthdata.nasa.gov/'), null);
+  assert.equal(context.safeGeointExternalLink('javascript:alert(1)'), null);
+});

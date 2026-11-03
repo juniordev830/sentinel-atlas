@@ -510,3 +510,44 @@ test('GeoINT só abre links HTTPS de NASA Worldview', () => {
   assert.equal(context.safeGeointExternalLink('http://worldview.earthdata.nasa.gov/'), null);
   assert.equal(context.safeGeointExternalLink('javascript:alert(1)'), null);
 });
+
+test('GeoINT limpa marcadores quando a consulta falha ou retorna indisponível', async () => {
+  const updates = [];
+  const output = {
+    textContent: '',
+    replaceChildren() {},
+    append() {}
+  };
+  const status = { textContent: '' };
+  const context = {
+    URLSearchParams,
+    document: {
+      getElementById: () => ({ value: '' }),
+      createElement: () => ({ textContent: '' }),
+      querySelector: () => null
+    },
+    globe: { pointOfView: () => ({ lat: -5.8, lng: -35.2 }) },
+    geointStatus: status,
+    geointLabel: { unavailable: 'Fonte indisponível' },
+    geointColors: {},
+    replaceAssets(type, items) { updates.push({ type, length: items.length }); },
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({ status: 'unavailable', items: [], error: 'Provedor offline' })
+    })
+  };
+  vm.runInNewContext(
+    snippet('async function queryGeointLayer(', 'async function loadGeointCatalog()'), context
+  );
+  const button = { disabled: false };
+  const layer = { id: 'weather', name: 'Tempo', provider: 'Open-Meteo', status: 'ready' };
+  await context.queryGeointLayer(layer, null, button, output);
+  assert.deepEqual(updates[0], { type: 'geoint-weather', length: 0 });
+  assert.equal(button.disabled, false);
+  context.fetch = async () => { throw new Error('rede offline'); };
+  await context.queryGeointLayer(layer, null, button, output);
+  assert.deepEqual(updates[1], { type: 'geoint-weather', length: 0 });
+  assert.match(output.textContent, /Marcadores anteriores removidos/);
+  assert.match(status.textContent, /falhou/);
+  assert.equal(button.disabled, false);
+});

@@ -607,6 +607,8 @@ test('visualização 3D Google só inicializa após clique, preservando mapa lic
       return { Map3DElement };
     } } },
     globe: { pointOfView: () => ({ lat: -5.8, lng: -35.2 }) },
+    googleMap: undefined,
+    googleMap3D: undefined,
     setMapView(value) { classes.toggle('map-mode', value); },
     console
   };

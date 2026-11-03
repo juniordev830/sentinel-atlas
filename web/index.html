@@ -820,6 +820,76 @@
           flex-wrap: nowrap;
         }
       }
+
+      /* Dados do Google aparecem somente sobre o mapa licenciado do Google. */
+      .google-places-panel {
+        display: none;
+        position: fixed;
+        top: 94px;
+        right: 18px;
+        width: min(360px, calc(100vw - 36px));
+        max-height: min(520px, calc(100dvh - 240px));
+        overflow-y: auto;
+        z-index: 32;
+        pointer-events: auto;
+        flex-direction: column;
+        gap: 10px;
+        border-top: 2px solid var(--cyan);
+        box-shadow: 0 20px 55px rgba(0, 0, 0, .55);
+      }
+      body.map-mode .google-places-panel { display: flex; }
+      body.map-mode.focus-mode .google-places-panel { display: none; }
+      .google-places-panel h2 {
+        margin: 0;
+        color: #e0faff;
+        font: 700 13px 'Inter', sans-serif;
+        letter-spacing: .04em;
+      }
+      .google-places-panel p { margin: 0; color: #b5c9d8; font-size: 11px; line-height: 1.5; }
+      .google-places-panel .google-places-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      #google-places-category {
+        min-width: 140px;
+        flex: 1 1 140px;
+        background: #0a1c30;
+        border: 1px solid rgba(103, 232, 249, .45);
+        border-radius: 9px;
+        min-height: 40px;
+        padding: 8px;
+        color: #e0faff;
+        font: 500 12px 'Inter', sans-serif;
+      }
+      .google-places-panel button { min-height: 40px; }
+      .google-places-panel button:focus-visible, #google-places-category:focus-visible {
+        outline: 2px solid #67e8f9;
+        outline-offset: 2px;
+      }
+      #google-places-status { color: #a5e7f5; font: 500 11px 'JetBrains Mono', monospace; }
+      #google-places-results { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+      #google-places-results li {
+        display: grid;
+        gap: 5px;
+        padding: 10px;
+        border: 1px solid rgba(103, 232, 249, .16);
+        border-radius: 9px;
+        background: rgba(2, 6, 23, .68);
+      }
+      #google-places-results strong { color: #e2faff; font-size: 12px; overflow-wrap: anywhere; }
+      #google-places-results small { color: #a7bbcf; overflow-wrap: anywhere; }
+      #google-places-results a { color: #67e8f9; font-size: 11px; }
+      #google-places-results li button { justify-self: start; }
+      @media (max-width: 900px) {
+        .google-places-panel {
+          top: auto;
+          bottom: calc(160px + env(safe-area-inset-bottom));
+          left: 10px;
+          right: 10px;
+          width: auto;
+          max-height: min(280px, 38dvh);
+        }
+      }
+      @media (max-height: 600px) {
+        .google-places-panel { max-height: 44dvh; bottom: 8px; }
+      }
     </style>
   </head>
   <body>
@@ -856,6 +926,27 @@
         </div>
       </div>
 
+      <section id="google-places-panel" class="panel google-places-panel" aria-label="Lugares próximos pelo Google Maps">
+        <h2>Google Maps · Locais próximos</h2>
+        <p>Selecione uma categoria e consulte o entorno do centro do mapa. Consultas podem gerar custos na sua conta Google Cloud.</p>
+        <div class="google-places-actions">
+          <label for="google-places-category" class="control-label">Categoria</label>
+          <select id="google-places-category">
+            <option value="restaurant">Restaurantes</option>
+            <option value="hospital">Hospitais</option>
+            <option value="pharmacy">Farmácias</option>
+            <option value="supermarket">Supermercados</option>
+            <option value="school">Escolas</option>
+            <option value="gas_station">Postos de combustível</option>
+            <option value="tourist_attraction">Atrações turísticas</option>
+          </select>
+          <button id="google-places-search" type="button">🔍 Buscar nesta área</button>
+          <button id="google-places-clear" type="button">Limpar</button>
+        </div>
+        <div id="google-places-status" role="status" aria-live="polite">Google Places opcional · nenhuma consulta realizada.</div>
+        <ol id="google-places-results" aria-label="Resultados do Google Places"></ol>
+        <p>Fonte: Google Maps Platform / Places API (New). Informações apresentadas apenas no mapa do Google.</p>
+      </section>
       <div class="compass-hud panel">
         <div id="compass-dir" class="compass-ring">N</div>
         <div>
@@ -1034,6 +1125,10 @@
 
       const earthquakeSource = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson';
       let googleMap;
+      let googleMapsLoadPromise;
+      let googlePlaceMarkers = [];
+      let googlePlacesInfoWindow;
+      let googlePlacesSearchSequence = 0;
       const textures = {
         night: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-night.jpg',
         day: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-blue-marble.jpg',
@@ -1637,31 +1732,198 @@
       refreshApiStatus();
       setInterval(refreshApiStatus, 30000);
 
+      // A API JavaScript usa uma chave de navegador restrita por domínio e serviço.
+      // Não confundir com SENTINEL_API_TOKEN, que nunca vai para o navegador.
+      async function loadGoogleMaps(apiKey) {
+        if (window.google?.maps?.Map) return;
+        if (!googleMapsLoadPromise) {
+          googleMapsLoadPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.async = true;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&language=pt-BR&region=BR`;
+            script.onload = () => window.google?.maps?.Map
+              ? resolve()
+              : reject(new Error('A biblioteca do Google Maps não inicializou.'));
+            script.onerror = () => reject(new Error('Não foi possível carregar o Google Maps.'));
+            document.head.appendChild(script);
+          }).catch(error => {
+            googleMapsLoadPromise = undefined;
+            throw error;
+          });
+        }
+        return googleMapsLoadPromise;
+      }
+
+      const googlePlacesTypes = new Set([
+        'restaurant', 'hospital', 'pharmacy', 'supermarket', 'school',
+        'gas_station', 'tourist_attraction'
+      ]);
+
+      function buildNearbySearchRequest(type, center, radius = 1500) {
+        const lat = Number(center?.lat);
+        const lng = Number(center?.lng);
+        if (!googlePlacesTypes.has(type)) throw new Error('Categoria de lugares não permitida.');
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+            Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+          throw new Error('Centro do mapa inválido.');
+        }
+        return {
+          fields: ['displayName', 'location', 'formattedAddress', 'googleMapsURI'],
+          locationRestriction: {
+            center: { lat, lng },
+            radius: Math.max(100, Math.min(5000, Number(radius) || 1500))
+          },
+          includedPrimaryTypes: [type],
+          maxResultCount: 8
+        };
+      }
+
+      function googleMapsLink(uri) {
+        try {
+          const parsed = new URL(uri);
+          if (parsed.protocol !== 'https:' ||
+              !['google.com', 'www.google.com', 'maps.google.com'].includes(parsed.hostname)) {
+            return null;
+          }
+          return parsed.href;
+        } catch {
+          return null;
+        }
+      }
+
+      function clearGooglePlacesResults() {
+        googlePlacesSearchSequence += 1; // Invalida buscas concorrentes em andamento.
+        googlePlaceMarkers.forEach(marker => marker.setMap(null));
+        googlePlaceMarkers = [];
+        googlePlacesInfoWindow?.close();
+        document.getElementById('google-places-results').replaceChildren();
+        document.getElementById('google-places-status').textContent =
+          'Resultados limpos. Faça uma busca quando desejar.';
+      }
+
+      async function searchGooglePlacesNearby() {
+        const button = document.getElementById('google-places-search');
+        const results = document.getElementById('google-places-results');
+        const status = document.getElementById('google-places-status');
+        if (!googleMap) {
+          status.textContent = 'Abra primeiro o mapa Google para consultar lugares.';
+          return;
+        }
+        const searchId = ++googlePlacesSearchSequence;
+        button.disabled = true;
+        status.textContent = 'Consultando Google Places (New)…';
+        try {
+          const { Place } = await google.maps.importLibrary('places');
+          const center = googleMap.getCenter();
+          const request = buildNearbySearchRequest(
+            document.getElementById('google-places-category').value,
+            { lat: center.lat(), lng: center.lng() }
+          );
+          // Consulta somente quando o usuário clicar; nenhum dado é salvo no servidor.
+          const { places = [] } = await Place.searchNearby(request);
+          if (searchId !== googlePlacesSearchSequence) return;
+          googlePlaceMarkers.forEach(marker => marker.setMap(null));
+          googlePlaceMarkers = [];
+          googlePlacesInfoWindow?.close();
+          results.replaceChildren();
+          if (!places.length) {
+            status.textContent = 'Nenhum local retornado para esta categoria e área.';
+            return;
+          }
+          googlePlacesInfoWindow ||= new google.maps.InfoWindow();
+          for (const place of places) {
+            if (!place.location) continue;
+            // Marcadores Legacy não exigem Map ID; ficam exclusivamente no Google Map.
+            const marker = new google.maps.Marker({
+              map: googleMap,
+              position: place.location,
+              title: place.displayName || 'Local próximo'
+            });
+            googlePlaceMarkers.push(marker);
+
+            const item = document.createElement('li');
+            const name = document.createElement('strong');
+            name.textContent = place.displayName || 'Local próximo';
+            const address = document.createElement('small');
+            address.textContent = place.formattedAddress || 'Endereço não informado';
+            const locate = document.createElement('button');
+            locate.type = 'button';
+            locate.textContent = '📍 Ver no mapa';
+            const details = document.createElement('div');
+            details.append(name, address);
+            item.append(details, locate);
+            const link = googleMapsLink(place.googleMapsURI);
+            if (link) {
+              const anchor = document.createElement('a');
+              anchor.href = link;
+              anchor.target = '_blank';
+              anchor.rel = 'noopener noreferrer';
+              anchor.textContent = 'Abrir no Google Maps';
+              item.appendChild(anchor);
+            }
+            const focus = () => {
+              googleMap.panTo(place.location);
+              googleMap.setZoom(Math.max(googleMap.getZoom() || 14, 15));
+              const info = document.createElement('div');
+              const label = document.createElement('strong');
+              label.textContent = place.displayName || 'Local próximo';
+              const line = document.createElement('p');
+              line.textContent = place.formattedAddress || 'Local identificado pelo Google Maps';
+              info.append(label, line);
+              googlePlacesInfoWindow.setContent(info);
+              googlePlacesInfoWindow.open({ map: googleMap, anchor: marker });
+            };
+            marker.addListener('click', focus);
+            locate.addEventListener('click', focus);
+            results.appendChild(item);
+          }
+          status.textContent = `Google Places · ${googlePlaceMarkers.length} local(is) nesta área.`;
+        } catch (error) {
+          if (searchId !== googlePlacesSearchSequence) return;
+          status.textContent = 'Google Places indisponível. Confira Places API (New), faturamento e restrições da chave.';
+          console.warn('Consulta Google Places não concluída:', error);
+        } finally {
+          button.disabled = false;
+        }
+      }
+      document.getElementById('google-places-search').addEventListener('click', searchGooglePlacesNearby);
+      document.getElementById('google-places-clear').addEventListener('click', clearGooglePlacesResults);
+
       async function openSatelliteMap() {
         const status = document.getElementById('api-status');
+        const placesStatus = document.getElementById('google-places-status');
         try {
-          const configResponse = await fetch('/api/public-config');
+          const configResponse = await fetch('/api/public-config', {
+            headers: { Accept: 'application/json' }
+          });
+          if (!configResponse.ok) throw new Error('configuração pública indisponível');
           const config = await configResponse.json();
-          if (!config.google_maps_api_key) throw new Error('adicione GOOGLE_MAPS_API_KEY no .env');
-          if (!window.google?.maps) {
-            await new Promise((resolve, reject) => {
-              const script = document.createElement('script');
-              script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(config.google_maps_api_key)}`;
-              script.onload = resolve;
-              script.onerror = () => reject(new Error('Google Maps indisponível'));
-              document.head.appendChild(script);
-            });
+          if (!config.google_maps_enabled || !config.google_maps_api_key) {
+            throw new Error('configure GOOGLE_MAPS_API_KEY com restrição por domínio');
           }
+          await loadGoogleMaps(config.google_maps_api_key);
+          const camera = globe.pointOfView();
+          const center = {
+            lat: Number.isFinite(camera?.lat) ? camera.lat : -23.5505,
+            lng: Number.isFinite(camera?.lng) ? camera.lng : -46.6333
+          };
+          // Exibir primeiro: o Google Maps precisa de um contêiner visível para inicializar.
+          setMapView(true);
           if (!googleMap) {
             googleMap = new google.maps.Map(document.getElementById('map'), {
-              center: { lat: -23.5505, lng: -46.6333 }, zoom: 11, mapTypeId: 'satellite',
+              center, zoom: 13, mapTypeId: 'hybrid',
+              mapTypeControl: true, fullscreenControl: true, streetViewControl: true
             });
             new google.maps.TrafficLayer().setMap(googleMap);
+          } else {
+            googleMap.setCenter(center);
           }
-          setMapView(true);
-          status.textContent = 'GOOGLE MAPS · satélite + trânsito';
+          placesStatus.textContent = 'Google Maps pronto. Clique em Buscar nesta área para obter locais próximos.';
+          status.textContent = 'GOOGLE MAPS · híbrido + trânsito · Places sob demanda';
         } catch (error) {
+          placesStatus.textContent = 'Google Maps não configurado. O globo 3D continua disponível.';
           status.textContent = `MAPA 2D INDISPONÍVEL · ${error.message}`;
+          setMapView(false);
         }
       }
       function setMapView(enabled) {

@@ -551,3 +551,114 @@ test('GeoINT limpa marcadores quando a consulta falha ou retorna indisponível',
   assert.match(status.textContent, /falhou/);
   assert.equal(button.disabled, false);
 });
+
+
+test('posição solar UTC permanece compatível com solstícios e equinócio', () => {
+  const context = { Date, Math };
+  vm.runInNewContext(
+    snippet('function estimateSubsolarPoint(date)', 'function initializeSentinel()'),
+    context
+  );
+  const march = context.estimateSubsolarPoint(new Date('2026-03-20T12:00:00Z'));
+  const june = context.estimateSubsolarPoint(new Date('2026-06-21T12:00:00Z'));
+  const december = context.estimateSubsolarPoint(new Date('2026-12-21T12:00:00Z'));
+  assert.ok(Math.abs(march.lat) < 1, 'equinócio próximo ao equador');
+  assert.ok(Math.abs(march.lng) < 5, 'meio-dia UTC próximo ao meridiano zero');
+  assert.ok(june.lat > 22 && june.lat < 24, 'solstício do norte');
+  assert.ok(december.lat < -22 && december.lat > -24, 'solstício do sul');
+});
+
+test('globo aplica iluminação solar dinâmica sem transmitir imagens Google', () => {
+  assert.match(html, /function refreshSolarLight\(\)/);
+  assert.match(html, /globe\.getCoords\(point\.lat, point\.lng, 10\)/);
+  assert.match(html, /globeMaterial\.specularMap = texture/);
+  assert.match(html, /earth-water\.png/);
+  assert.match(html, /id="solar-status"/);
+  const globeView = snippet('const globe = Globe()', '// Iluminação solar dinâmica');
+  assert.doesNotMatch(globeView, /tile\.googleapis\.com|maps\.googleapis\.com/);
+});
+
+test('visualização 3D Google só inicializa após clique, preservando mapa licenciado', async () => {
+  const created = [];
+  class Map3DElement {
+    constructor(options) { this.options = options; created.push(this); }
+  }
+  const mapHolder = { replaceChildren(...children) { this.children = children; } };
+  const status = { textContent: '' };
+  const google3dButton = { attrs: {}, setAttribute(key, value) { this.attrs[key] = value; } };
+  const classes = classList();
+  let loadCalls = 0;
+  const context = {
+    document: {
+      body: { classList: classes },
+      getElementById(id) {
+        if (id === 'api-status') return status;
+        if (id === 'map-3d') return mapHolder;
+        if (id === 'google-3d-view') return google3dButton;
+        throw new Error('Elemento inesperado: ' + id);
+      }
+    },
+    fetch: async () => ({ ok: true, json: async () => ({
+      google_maps_enabled: true, google_maps_api_key: 'fake-restricted-browser-key'
+    }) }),
+    loadGoogleMaps: async () => { loadCalls++; },
+    google: { maps: { importLibrary: async lib => {
+      assert.equal(lib, 'maps3d');
+      return { Map3DElement };
+    } } },
+    globe: { pointOfView: () => ({ lat: -5.8, lng: -35.2 }) },
+    setMapView(value) { classes.toggle('map-mode', value); },
+    console
+  };
+  vm.runInNewContext(
+    snippet('async function openGoogle3DMap()', 'function setMapView(enabled)'),
+    context
+  );
+  assert.equal(created.length, 0, 'não gera consultas na abertura do aplicativo');
+  await context.openGoogle3DMap();
+  assert.equal(loadCalls, 1);
+  assert.equal(created.length, 1);
+  assert.equal(created[0].options.mode, 'HYBRID');
+  assert.equal(created[0].options.tilt, 65);
+  assert.equal(mapHolder.children[0], created[0]);
+  assert.equal(classes.contains('google3d-mode'), true);
+  assert.equal(google3dButton.attrs['aria-pressed'], 'true');
+  assert.match(status.textContent, /GOOGLE 3D/);
+});
+
+test('Google 3D exige chave e não faz renderização Google sem credenciais', async () => {
+  let loads = 0;
+  const classes = classList();
+  const status = { textContent: '' };
+  const button = { setAttribute() {} };
+  const context = {
+    document: {
+      body: { classList: classes },
+      getElementById: id => id === 'api-status' ? status : button
+    },
+    fetch: async () => ({ ok: true, json: async () => ({
+      google_maps_enabled: false, google_maps_api_key: null
+    }) }),
+    loadGoogleMaps: async () => { loads++; },
+    setMapView(value) { classes.toggle('map-mode', value); },
+    console
+  };
+  vm.runInNewContext(
+    snippet('async function openGoogle3DMap()', 'function setMapView(enabled)'),
+    context
+  );
+  await context.openGoogle3DMap();
+  assert.equal(loads, 0);
+  assert.equal(classes.contains('google3d-mode'), false);
+  assert.match(status.textContent, /GOOGLE 3D INDISPONÍVEL/);
+  assert.match(status.textContent, /GOOGLE_MAPS_API_KEY/);
+});
+
+test('Google 3D preserva rótulos do Google e mantém Places só no mapa 2D', () => {
+  assert.match(html, /id="google-3d-view"[^>]*aria-pressed="false"/);
+  assert.match(html, /id="map-3d"[^>]*aria-label="Mapa Google 3D fotorrealista"/);
+  assert.match(html, /#map-3d gmp-map-3d \{ display: block; width: 100%; height: 100%; \}/);
+  assert.match(html, /body\.map-mode\.google3d-mode \.google-places-panel \{ display: none; \}/);
+  assert.match(html, /google\.maps\.importLibrary\('maps3d'\)/);
+  assert.doesNotMatch(html, /localStorage\.setItem\(['"]google-3d/);
+});

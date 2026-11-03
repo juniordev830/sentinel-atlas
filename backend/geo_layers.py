@@ -109,6 +109,20 @@ def _point(key, name, lat, lng, description="", timestamp=None, data_kind=None):
     }
 
 
+def _number(value, minimum=None, maximum=None):
+    """Somente medições numéricas finitas para painéis, nunca valores inventados."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    if not math.isfinite(number):
+        return None
+    if minimum is not None and number < minimum:
+        return None
+    if maximum is not None and number > maximum:
+        return None
+    return number
+
+
 def _geojson(payload, layer):
     if not isinstance(payload, dict) or payload.get("type") != "FeatureCollection":
         raise SourceUnavailable("GeoJSON incompatível com o contrato de FeatureCollection.")
@@ -158,7 +172,7 @@ def _run_layer(layer, lat, lng, region):
     if layer == "weather":
         data = _request("https://api.open-meteo.com/v1/forecast", params={
             "latitude": lat, "longitude": lng,
-            "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation",
+            "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation,cloud_cover",
             "timezone": "UTC",
         })
         current = data.get("current", {})
@@ -167,6 +181,15 @@ def _run_layer(layer, lat, lng, region):
                    " °C · Umidade " + str(current.get("relative_humidity_2m", "?")) +
                    "% · Vento " + str(current.get("wind_speed_10m", "?")) + " km/h",
                    current.get("time"), "model")
+        if p:
+            p["measurements"] = {
+                "temperature_c": _number(current.get("temperature_2m"), -100, 70),
+                "humidity_pct": _number(current.get("relative_humidity_2m"), 0, 100),
+                "wind_speed_kmh": _number(current.get("wind_speed_10m"), 0, 500),
+                "wind_direction_deg": _number(current.get("wind_direction_10m"), 0, 360),
+                "precipitation_mm": _number(current.get("precipitation"), 0, 5000),
+                "cloud_cover_pct": _number(current.get("cloud_cover"), 0, 100),
+            }
         return ([p] if p else []), None
     if layer == "air_quality":
         data = _request("https://air-quality-api.open-meteo.com/v1/air-quality", params={
@@ -178,6 +201,12 @@ def _run_layer(layer, lat, lng, region):
                    " µg/m³ · PM10: " + str(current.get("pm10", "?")) +
                    " µg/m³ · AQI EUA: " + str(current.get("us_aqi", "?")),
                    current.get("time"), "model")
+        if p:
+            p["measurements"] = {
+                "pm25_ugm3": _number(current.get("pm2_5"), 0, 5000),
+                "pm10_ugm3": _number(current.get("pm10"), 0, 5000),
+                "us_aqi": _number(current.get("us_aqi"), 0, 500),
+            }
         return ([p] if p else []), None
     if layer == "terrain":
         data = _request("https://api.open-meteo.com/v1/elevation", params={"latitude": lat, "longitude": lng})

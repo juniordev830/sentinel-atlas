@@ -1495,9 +1495,13 @@
       // Iluminação solar dinâmica, aproximada com base na data/hora UTC.
       const globeMaterial = globe.globeMaterial();
       let cloudsMesh = null;
+      let cityLightsMesh = null;
+      let cityLightsRequested = false;
+      let solarLight = null;
       if (window.THREE) {
         try {
           const sun = new THREE.DirectionalLight(0xfff0d8, 2.0);
+          solarLight = sun;
           const skyBounce = new THREE.AmbientLight(0x87aec6, 0.27);
           globe.lights?.([skyBounce, sun]);
           function refreshSolarLight() {
@@ -1543,8 +1547,6 @@
       // Luzes urbanas noturnas renderizadas sobre a metade escura do globo.
       // Usamos a textura pública de luzes terrestres do globo, nunca tiles Google.
       // O shader e a geometria são opcionais e desligados no perfil Econômico.
-      let cityLightsMesh = null;
-      let cityLightsRequested = false;
       function loadCityLights() {
         if (!window.THREE || cityLightsRequested) return;
         cityLightsRequested = true;
@@ -1586,8 +1588,8 @@
             });
             const geometry = new THREE.SphereGeometry(globe.getGlobeRadius() * 1.002, 96, 64);
             cityLightsMesh = new THREE.Mesh(geometry, material);
-            if (typeof sun !== 'undefined') {
-              cityLightsMesh.material.uniforms.sunVector.value.copy(sun.position).normalize();
+            if (solarLight) {
+              cityLightsMesh.material.uniforms.sunVector.value.copy(solarLight.position).normalize();
             }
             globe.scene().add(cityLightsMesh);
             applyRenderQuality();

@@ -129,3 +129,70 @@ def test_geoint_api_layer_sample_and_cache(monkeypatch):
     assert second.json()["cached"] is True
     assert calls == ["weather"]
     layers._cache.clear()
+
+def test_geoint_cache_keeps_nearby_coordinates_separate(monkeypatch):
+    """Coordenadas distintas não podem compartilhar resultado por arredondamento amplo."""
+    layers._cache.clear()
+    calls = []
+
+    def fake_layer(layer, lat, lng, region):
+        calls.append((lat, lng))
+        return [layers._point("local", "Consulta geográfica", lat, lng)], None
+
+    monkeypatch.setattr(layers, "_run_layer", fake_layer)
+    try:
+        first = layers.fetch_layer("weather", -5.80111, -35.20111)
+        second = layers.fetch_layer("weather", -5.80444, -35.20444)
+        again = layers.fetch_layer("weather", -5.80111, -35.20111)
+        assert len(calls) == 2
+        assert first["items"][0]["lat"] != second["items"][0]["lat"]
+        assert first["cached"] is False
+        assert second["cached"] is False
+        assert again["cached"] is True
+    finally:
+        layers._cache.clear()
+
+
+def test_geoint_download_stops_when_response_exceeds_limit(monkeypatch):
+    """O limite de 1,5 MB precisa interromper o streaming, não só validar no fim."""
+    import httpx
+    import pytest
+    from backend.source_clients import SourceUnavailable
+
+    class CountingStream(httpx.SyncByteStream):
+        read_chunks = 0
+
+        def __iter__(self):
+            for _ in range(5):
+                self.read_chunks += 1
+                yield b"x" * 600_000
+
+    source = CountingStream()
+    original_client = httpx.Client
+
+    def mock_client(**kwargs):
+        return original_client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(200, stream=source)
+            ), **kwargs
+        )
+
+    monkeypatch.setattr(layers.httpx, "Client", mock_client)
+    with pytest.raises(SourceUnavailable, match="maior que o limite"):
+        layers._request("https://example.org/oversized", text=True)
+    assert source.read_chunks < 5, "o corpo inteiro foi descarregado antes do limite"
+
+
+def test_geoint_streamed_json_response(monkeypatch):
+    import httpx
+
+    original_client = httpx.Client
+    monkeypatch.setattr(
+        layers.httpx, "Client",
+        lambda **kwargs: original_client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(200, json={"entries": [1, 2]})
+            ), **kwargs
+        )
+    )
+    assert layers._request("https://example.org/feed") == {"entries": [1, 2]}

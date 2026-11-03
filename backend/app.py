@@ -30,6 +30,7 @@ from backend.routing import bicycle_route  # noqa: E402
 from backend.orbits import propagate_tle  # noqa: E402
 from backend.ai import GeoINTAnalyzer  # noqa: E402
 from backend.location import get_location_info  # noqa: E402
+from backend.geo_layers import catalog as geoint_catalog, fetch_layer as geoint_fetch_layer  # noqa: E402
 
 
 
@@ -306,6 +307,28 @@ def public_config() -> dict[str, str | bool | None]:
         "google_maps_api_key": settings.google_maps_api_key,
         "google_maps_enabled": bool(settings.google_maps_api_key),
     }
+
+
+@app.get("/api/geoint/layers")
+def geoint_layers() -> dict[str, Any]:
+    """Catálogo das 16 fontes, sem efetuar consultas pagas nem vazar chaves."""
+    return {"count": 16, "layers": geoint_catalog()}
+
+
+@app.get("/api/geoint/layers/{layer_id}")
+def geoint_layer_data(
+    layer_id: str,
+    lat: float = Query(ge=-90, le=90),
+    lng: float = Query(ge=-180, le=180),
+    uf: str = Query(default="", max_length=2),
+) -> dict[str, Any]:
+    """Consulta explícita e limitada por fonte; o globo nunca inicia varreduras em massa."""
+    try:
+        return geoint_fetch_layer(layer_id, lat, lng, region=uf)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Camada inexistente") from None
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Parâmetros geográficos inválidos") from None
 
 
 @app.get("/api/sources/satellites")

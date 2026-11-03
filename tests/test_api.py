@@ -10,6 +10,39 @@ from backend.app import PositionInput, app
 client = TestClient(app)
 
 
+
+def test_google_maps_public_config_never_exposes_admin_token(monkeypatch):
+    """A chave do navegador pode ser pública, mas o token administrativo nunca."""
+    monkeypatch.setattr(
+        app_module,
+        "settings",
+        replace(
+            app_module.settings,
+            environment="test",
+            api_token="private-sentinel-token",
+            google_maps_api_key="browser-referrer-restricted-key",
+        ),
+    )
+    response = client.get("/api/public-config")
+    assert response.status_code == 200
+    assert response.json() == {
+        "google_maps_api_key": "browser-referrer-restricted-key",
+        "google_maps_enabled": True,
+    }
+    assert "private-sentinel-token" not in response.text
+
+    monkeypatch.setattr(
+        app_module,
+        "settings",
+        replace(app_module.settings, google_maps_api_key=None),
+    )
+    response = client.get("/api/public-config")
+    assert response.json() == {
+        "google_maps_api_key": None,
+        "google_maps_enabled": False,
+    }
+
+
 def test_create_list_and_delete_geofence():
     # List initial
     resp = client.get("/api/geofences")

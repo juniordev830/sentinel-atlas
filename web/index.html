@@ -43,8 +43,12 @@
       }
       #globe { position: fixed; inset: 0; }
       #map { position: fixed; inset: 0; display: none; }
+      #map-3d { position: fixed; inset: 0; display: none; background: #050811; }
+      #map-3d gmp-map-3d { display: block; width: 100%; height: 100%; }
       body.map-mode #globe { display: none; }
       body.map-mode #map { display: block; }
+      body.map-mode.google3d-mode #map { display: none; }
+      body.map-mode.google3d-mode #map-3d { display: block; }
       .hud {
         position: fixed;
         inset: 0;
@@ -452,10 +456,559 @@
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
       }
+
+
+      /* Command Center 2.0: visualizações decorativas, sem bloquear o globo. */
+      .tactical-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        overflow: hidden;
+        pointer-events: none;
+        background:
+          linear-gradient(180deg, rgba(2, 6, 23, .22), transparent 21%, transparent 75%, rgba(2, 6, 23, .26));
+      }
+      .tactical-overlay::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(103, 232, 249, .09) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(103, 232, 249, .09) 1px, transparent 1px);
+        background-size: 76px 76px;
+        -webkit-mask-image: radial-gradient(ellipse at 50% 50%, transparent 25%, #000 90%);
+        mask-image: radial-gradient(ellipse at 50% 50%, transparent 25%, #000 90%);
+        opacity: .4;
+      }
+      .tactical-overlay::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(transparent 45%, rgba(34, 211, 238, .045) 50%, transparent 55%);
+        background-size: 100% 240px;
+        animation: tactical-scan 18s linear infinite;
+        opacity: .5;
+      }
+      @keyframes tactical-scan {
+        from { background-position: 0 -240px; }
+        to { background-position: 0 100vh; }
+      }
+      .tactical-reticle {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 94px;
+        height: 94px;
+        transform: translate(-50%, -50%);
+        border: 1px solid rgba(103, 232, 249, .17);
+        border-radius: 50%;
+        box-shadow: 0 0 0 29px rgba(103, 232, 249, .018), 0 0 0 63px rgba(103, 232, 249, .015);
+      }
+      .tactical-reticle::before, .tactical-reticle::after {
+        content: "";
+        position: absolute;
+        background: rgba(103, 232, 249, .3);
+      }
+      .tactical-reticle::before { width: 1px; height: 128px; left: 50%; top: -18px; }
+      .tactical-reticle::after { height: 1px; width: 128px; top: 50%; left: -18px; }
+      .tactical-corner {
+        position: absolute;
+        width: 26px;
+        height: 26px;
+        border-color: rgba(34, 211, 238, .52);
+        border-style: solid;
+      }
+      .tactical-corner.tl { top: 13px; left: 13px; border-width: 1px 0 0 1px; }
+      .tactical-corner.tr { top: 13px; right: 13px; border-width: 1px 1px 0 0; }
+      .tactical-corner.bl { bottom: 13px; left: 13px; border-width: 0 0 1px 1px; }
+      .tactical-corner.br { bottom: 13px; right: 13px; border-width: 0 1px 1px 0; }
+      .tactical-caption {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        margin-top: 62px;
+        transform: translateX(-50%);
+        color: rgba(148, 210, 225, .7);
+        font: 500 9px 'JetBrains Mono', monospace;
+        letter-spacing: .22em;
+        white-space: nowrap;
+        text-shadow: 0 2px 8px #020617;
+      }
+      body.map-mode .tactical-overlay { display: none; }
+      .brand { position: relative; overflow: hidden; }
+      .brand::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 58px;
+        height: 58px;
+        background: linear-gradient(125deg, transparent, rgba(34, 211, 238, .08));
+        clip-path: polygon(100% 0, 100% 100%, 0 0);
+      }
+      .brand small {
+        display: inline-block;
+        margin-top: 4px;
+        color: #67e8f9;
+        font: 500 9px 'JetBrains Mono', monospace;
+        letter-spacing: .12em;
+      }
+      .control-deck { border-top: 2px solid rgba(34, 211, 238, .65); }
+      .control-label { color: #7dd3fc; }
+      .filters button, .tool-actions button { white-space: nowrap; }
+      .filters button:hover, .tool-actions button:hover {
+        border-color: rgba(103, 232, 249, .7);
+        box-shadow: 0 0 0 1px rgba(103, 232, 249, .08), 0 5px 18px rgba(8, 145, 178, .13);
+      }
+      #focus-mode { border-color: rgba(125, 211, 252, .42); color: #d6f7ff; }
+      #focus-mode[aria-pressed="true"] {
+        background: rgba(34, 211, 238, .22);
+        border-color: #67e8f9;
+      }
+      body.focus-mode .compass-hud,
+      body.focus-mode .overview-panel,
+      body.focus-mode .bottombar,
+      body.focus-mode .inspector,
+      body.focus-mode .ai-panel,
+      body.focus-mode .search-wrap,
+      body.focus-mode #api-status {
+        display: none !important;
+      }
+      body.focus-mode .topbar { justify-content: space-between; }
+      body.focus-mode .tools { width: auto; }
+      @media (max-width: 900px) {
+        .tactical-reticle { width: 64px; height: 64px; }
+        .tactical-reticle::before { height: 94px; top: -16px; }
+        .tactical-reticle::after { width: 94px; left: -16px; }
+        .tactical-caption { margin-top: 45px; font-size: 8px; }
+        body.focus-mode .hud {
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+        }
+        body.focus-mode .topbar { flex-direction: row; }
+        body.focus-mode .tools { flex: 0 0 auto; }
+      }
+      @media (max-width: 520px) {
+        .tactical-corner { width: 17px; height: 17px; }
+        .tactical-reticle, .tactical-caption { display: none; }
+        .brand small { display: none; }
+        #focus-mode { font-size: 11px; padding-inline: 10px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .tactical-overlay::after { animation: none; opacity: .15; }
+        .brand-icon { animation: none; }
+      }
+
+      /* Painel de operação: hierarquia mais clara sem cobrir o globo. */
+      #globe, #map, #map-3d { z-index: 0; }
+      #globe::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 38%, rgba(2, 6, 23, .48) 100%);
+      }
+      #globe-fallback[hidden] { display: none; }
+      #globe-fallback {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 14px;
+        padding: 24px;
+        pointer-events: none;
+        text-align: center;
+      }
+      .fallback-orb {
+        width: min(48vw, 440px);
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, transparent 20%, rgba(0, 5, 16, .9) 78%),
+          url('https://unpkg.com/three-globe@2.43.0/example/img/earth-night.jpg') 38% center / auto 100%,
+          radial-gradient(circle at 35% 30%, #164e63, #020617 78%);
+        box-shadow: 0 0 45px rgba(34, 211, 238, .16), inset -30px -25px 60px rgba(0, 0, 0, .7);
+      }
+      .fallback-message { max-width: 340px; color: #c4d9e6; line-height: 1.5; }
+      .fallback-message strong { display: block; color: #f0fdff; font-size: 14px; }
+      button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+      .hud { z-index: 10; }
+      .brand, .panel {
+        border-color: rgba(103, 232, 249, .24);
+        background: linear-gradient(145deg, rgba(10, 25, 43, .94), rgba(3, 10, 21, .88));
+        box-shadow: 0 18px 48px rgba(0, 0, 0, .42), inset 0 1px 0 rgba(255, 255, 255, .06);
+      }
+      .brand { border-left: 3px solid var(--cyan); }
+      .brand strong { color: #f0fdff; }
+      .brand span, .overview-row, .overview-stat span { color: #b5c9d8; }
+      .status { color: #b9eaf3; }
+      .status::before { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+      .overview-panel > summary { cursor: pointer; list-style: none; }
+      .overview-panel > summary::-webkit-details-marker { display: none; }
+      .overview-panel > summary::after { content: '▾'; color: var(--cyan); font-size: 13px; }
+      .overview-panel:not([open]) > summary { margin-bottom: 0; }
+      .overview-title-short { display: none; }
+      .overview-stat span { font-size: 10px; line-height: 1.4; }
+      .overview-stat { border-color: rgba(103, 232, 249, .16); }
+      .overview-foot { color: #a4b9ca; }
+      #google-3d-view[aria-pressed="true"] {
+        border-color: rgba(52, 211, 153, .9);
+        color: #d1fae5;
+        background: rgba(5, 150, 105, .2);
+      }
+      .solar-caption { color: #fcd34d; font: 500 10px 'JetBrains Mono', monospace; white-space: nowrap; }
+      .render-quality-control {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        white-space: nowrap;
+        color: #bae6fd;
+        font: 600 10px 'JetBrains Mono', monospace;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+      }
+      #render-quality {
+        width: auto;
+        min-height: 36px;
+        padding: 7px 25px 7px 9px;
+        border: 1px solid rgba(103, 232, 249, .5);
+        border-radius: 8px;
+        color: #e0f7ff;
+        background: #0a1c30;
+        font: 500 11px 'JetBrains Mono', monospace;
+        cursor: pointer;
+      }
+      #render-quality:focus-visible {
+        outline: 2px solid #67e8f9;
+        outline-offset: 3px;
+      }
+      .tool-actions button[aria-pressed="true"] {
+        border-color: rgba(103, 232, 249, .65);
+        background: rgba(8, 145, 178, .22);
+        color: #e0faff;
+      }
+      .control-deck {
+        flex: 1;
+        min-width: 0;
+        max-width: 1080px;
+        padding: 11px 13px;
+        display: grid;
+        gap: 8px;
+      }
+      .control-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+      .control-label {
+        flex: 0 0 75px;
+        color: #a7c2d2;
+        font: 600 10px 'JetBrains Mono', monospace;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+      }
+      .filters, .tool-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; min-width: 0; }
+      .bottombar { align-items: flex-end; }
+      .legend { max-width: 360px; flex-wrap: wrap; justify-content: flex-end; }
+      button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+      @media (max-width: 900px) {
+        .hud {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          grid-template-rows: auto auto minmax(0, 1fr) auto;
+          gap: 8px;
+          justify-content: normal;
+        }
+        .topbar { grid-row: 1; grid-column: 1 / -1; }
+        .compass-hud {
+          position: static;
+          grid-row: 2;
+          grid-column: 1;
+          justify-self: start;
+          align-self: start;
+          margin: 0;
+        }
+        .overview-panel {
+          display: block;
+          position: static;
+          grid-row: 2;
+          grid-column: 2;
+          justify-self: end;
+          align-self: start;
+          width: auto;
+          max-height: max(100px, calc(100dvh - 300px));
+          margin: 0;
+          z-index: 12;
+        }
+        .overview-panel[open] { grid-column: 1 / -1; width: min(238px, 100%); }
+        .bottombar { grid-row: 4; grid-column: 1 / -1; min-width: 0; }
+        .control-deck { width: 100%; }
+        .control-row { display: grid; gap: 5px; }
+        .filters, .tool-actions {
+          justify-content: flex-start;
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          max-width: 100%;
+          padding: 2px 2px 5px;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(103, 232, 249, .55) transparent;
+        }
+        .filters button, .tool-actions button { flex: 0 0 auto; min-height: 44px; }
+        .legend { display: none; }
+        .inspector, .ai-panel {
+          position: fixed;
+          right: 10px;
+          top: 110px;
+          width: min(360px, calc(100vw - 20px));
+          max-height: max(110px, calc(100dvh - 260px));
+          overflow-y: auto;
+          margin: 0;
+          z-index: 30;
+        }
+      }
+      @media (max-width: 768px) {
+        .hud { padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+        .topbar { flex-direction: column; gap: 6px; }
+        .brand { min-height: 42px; padding: 8px 12px; }
+        .brand span { display: none; }
+        .tools { display: flex; flex-wrap: nowrap; align-items: stretch; width: 100%; }
+        .search-wrap { flex: 1; width: auto; min-width: 0; }
+        #asset-search { width: 100%; min-width: 0; min-height: 44px; }
+        #api-status { max-width: 45%; max-height: 60px; overflow: auto; white-space: normal; line-height: 1.3; }
+      }
+      @media (max-width: 520px) {
+        .overview-title-full { display: none; }
+        .overview-title-short { display: inline; }
+      }
+      @media (max-height: 500px) and (max-width: 900px) {
+        .compass-hud, .overview-panel { display: none; }
+        .hud { grid-template-rows: auto minmax(0, 1fr) auto; }
+        .bottombar { grid-row: 3; }
+      }
+
+      /* A camada decorativa fica oculta quando a visualização 3D falha. */
+      #globe-fallback:not([hidden]) ~ .tactical-overlay { display: none; }
+
+      /* Evita sobreposição da pesquisa, do status e do modo foco no celular. */
+      @media (max-width: 768px) {
+        .topbar .tools {
+          flex-wrap: wrap;
+          gap: 6px;
+          justify-content: stretch;
+        }
+        .topbar .search-wrap {
+          flex: 1 0 100%;
+          min-width: 0;
+        }
+        .topbar #api-status {
+          flex: 1 1 130px;
+          max-width: calc(100% - 128px);
+          min-width: 0;
+          justify-content: flex-start;
+        }
+        .topbar #focus-mode {
+          flex: 0 0 auto;
+          min-height: 44px;
+        }
+        body.focus-mode .topbar {
+          flex-direction: row;
+          gap: 8px;
+          align-items: flex-start;
+        }
+        body.focus-mode .brand {
+          flex: 1 1 auto;
+          min-width: 0;
+          padding: 10px;
+        }
+        body.focus-mode .brand strong {
+          font-size: 11px;
+          letter-spacing: .08em;
+        }
+        body.focus-mode .brand span,
+        body.focus-mode .brand small { display: none; }
+        body.focus-mode .topbar .tools {
+          width: auto;
+          flex: 0 0 auto;
+          flex-wrap: nowrap;
+        }
+      }
+
+      /* Fontes GeoINT: catálogo compacto com ações explícitas, nunca varredura automática. */
+      .geoint-sources-panel {
+        position: fixed;
+        z-index: 31;
+        top: 94px;
+        left: 18px;
+        width: min(380px, calc(100vw - 36px));
+        max-height: min(570px, calc(100dvh - 220px));
+        overflow-y: auto;
+        padding: 14px;
+        pointer-events: auto;
+        border-top: 2px solid #67e8f9;
+      }
+      .geoint-sources-panel[hidden] { display: none !important; }
+      body.focus-mode .geoint-sources-panel { display: none; }
+      .geoint-panel-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      .geoint-panel-header strong { color: #e5faff; font-size: 13px; }
+      .geoint-panel-header button { min-height: 36px; }
+      .geoint-note, .geoint-status { color: #b3cad9; font-size: 11px; line-height: 1.5; }
+      .geoint-status { color: #67e8f9; }
+      .geoint-source-list { display: grid; gap: 8px; margin: 10px 0 0; }
+      .geoint-source {
+        border: 1px solid rgba(103, 232, 249, .17);
+        border-radius: 10px;
+        background: rgba(7, 18, 34, .72);
+        padding: 10px;
+        display: grid;
+        gap: 6px;
+      }
+      .geoint-source-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .geoint-source-heading strong { color: #e2faff; font-size: 12px; }
+      .geoint-source-heading small { color: #9fbbc9; font-size: 10px; }
+      .geoint-source p { margin: 0; color: #9db6c7; font-size: 11px; line-height: 1.45; }
+      .geoint-source button { min-height: 36px; justify-self: start; }
+      .geoint-source button:focus-visible, #geoint-uf:focus-visible {
+        outline: 2px solid #67e8f9; outline-offset: 2px;
+      }
+      .geoint-source .geoint-results { padding-left: 18px; margin: 0; color: #d9eef6; font-size: 11px; }
+      .geoint-source .geoint-results li { margin: 3px 0; }
+      .geoint-source a { color: #67e8f9; font-size: 11px; }
+      #geoint-uf { color: #e2faff; background: #0a1c30; border: 1px solid rgba(103,232,249,.45); border-radius: 8px; padding: 8px; }
+      @media (max-width: 900px) {
+        .geoint-sources-panel { left: 10px; right: 10px; width: auto; top: 75px; max-height: 47dvh; }
+      }
+      /* Dados do Google aparecem somente sobre o mapa licenciado do Google. */
+      .google-places-panel {
+        display: none;
+        position: fixed;
+        top: 94px;
+        right: 18px;
+        width: min(360px, calc(100vw - 36px));
+        max-height: min(520px, calc(100dvh - 240px));
+        overflow-y: auto;
+        z-index: 32;
+        pointer-events: auto;
+        flex-direction: column;
+        gap: 10px;
+        border-top: 2px solid var(--cyan);
+        box-shadow: 0 20px 55px rgba(0, 0, 0, .55);
+      }
+      body.map-mode .google-places-panel { display: flex; }
+      body.map-mode.google3d-mode .google-places-panel { display: none; }
+      body.map-mode.focus-mode .google-places-panel { display: none; }
+      .google-places-panel h2 {
+        margin: 0;
+        color: #e0faff;
+        font: 700 13px 'Inter', sans-serif;
+        letter-spacing: .04em;
+      }
+      .google-places-panel p { margin: 0; color: #b5c9d8; font-size: 11px; line-height: 1.5; }
+      .google-places-panel .google-places-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      #google-places-category {
+        min-width: 140px;
+        flex: 1 1 140px;
+        background: #0a1c30;
+        border: 1px solid rgba(103, 232, 249, .45);
+        border-radius: 9px;
+        min-height: 40px;
+        padding: 8px;
+        color: #e0faff;
+        font: 500 12px 'Inter', sans-serif;
+      }
+      .google-places-panel button { min-height: 40px; }
+      .google-places-panel button:focus-visible, #google-places-category:focus-visible {
+        outline: 2px solid #67e8f9;
+        outline-offset: 2px;
+      }
+      #google-places-status { color: #a5e7f5; font: 500 11px 'JetBrains Mono', monospace; }
+      #google-places-results { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+      #google-places-results li {
+        display: grid;
+        gap: 5px;
+        padding: 10px;
+        border: 1px solid rgba(103, 232, 249, .16);
+        border-radius: 9px;
+        background: rgba(2, 6, 23, .68);
+      }
+      #google-places-results strong { color: #e2faff; font-size: 12px; overflow-wrap: anywhere; }
+      #google-places-results small { color: #a7bbcf; overflow-wrap: anywhere; }
+      #google-places-results a { color: #67e8f9; font-size: 11px; }
+      #google-places-results li button { justify-self: start; }
+      @media (max-width: 900px) {
+        .google-places-panel {
+          top: auto;
+          bottom: calc(160px + env(safe-area-inset-bottom));
+          left: 10px;
+          right: 10px;
+          width: auto;
+          max-height: min(280px, 38dvh);
+        }
+      }
+      @media (max-height: 600px) {
+        .google-places-panel { max-height: 44dvh; bottom: 8px; }
+      }
+      /* Visualização meteorológica transparente: modelos e eventos identificados por fonte. */
+      .weather-panel {
+        position: fixed; z-index: 35; right: 18px; top: 94px;
+        width: min(365px, calc(100vw - 36px)); max-height: min(625px, 72dvh);
+        overflow: auto; pointer-events: auto; border-top: 2px solid #7dd3fc;
+      }
+      .weather-panel[hidden], body.focus-mode .weather-panel { display: none !important; }
+      .weather-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      .weather-header strong { font-size: 13px; color: #e0faff; }
+      .weather-header button, .weather-actions button { min-height: 40px; }
+      .weather-note, .weather-status { color: #b5c9d8; font-size: 11px; line-height: 1.5; margin: 8px 0; }
+      .weather-status { color: #7dd3fc; min-height: 24px; }
+      #weather-source, #camera-destination {
+        color: #e0faff; background: #0a1c30; border: 1px solid rgba(103,232,249,.45);
+        border-radius: 8px; padding: 8px; font: 500 11px 'JetBrains Mono',monospace;
+        max-width: 100%;
+      }
+      .weather-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      .weather-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 10px 0; }
+      .weather-metric {
+        padding: 10px; background: rgba(12,29,47,.88);
+        border: 1px solid rgba(125,211,252,.22); border-radius: 10px;
+      }
+      .weather-metric span { display: block; font-size: 10px; color: #a6bfd0; line-height: 1.5; }
+      .weather-metric strong { display: block; font: 600 16px 'JetBrains Mono',monospace; color: #e4faff; }
+      .weather-wind-arrow { display: inline-block; color: #7dd3fc; transform-origin: center; font-size: 18px; margin-left: 4px; }
+      .weather-events { padding-left: 18px; margin: 8px 0; color: #d7e9f0; font-size: 11px; }
+      .weather-events li { margin: 4px 0; }
+      .camera-control { display: inline-flex; align-items: center; gap: 6px; color: #b3d6e5; font-size: 10px; }
+      #camera-destination { min-height: 36px; }
+      #google3d-toolbar {
+        display: none; position: fixed; z-index: 11;
+        left: 50%; bottom: 175px; transform: translateX(-50%);
+        gap: 8px; align-items: center; padding: 10px;
+        border-radius: 12px; border: 1px solid rgba(125,211,252,.38);
+        background: rgba(4,15,29,.91); pointer-events: auto;
+        box-shadow: 0 12px 35px #0008;
+      }
+      body.map-mode.google3d-mode #google3d-toolbar { display: flex; }
+      body.focus-mode #google3d-toolbar { display: none; }
+      #google3d-toolbar button { min-height: 40px; white-space: nowrap; }
+      @media (max-width:900px) {
+        .weather-panel { left: 10px; right: 10px; top: 75px; width: auto; max-height: 50dvh; }
+        #google3d-toolbar { bottom: 160px; max-width: calc(100vw - 20px); overflow-x: auto; }
+      }
+      @media (prefers-reduced-motion:reduce) {
+        .weather-panel *, #google3d-toolbar * { animation: none !important; transition: none !important; }
+      }
     </style>
   </head>
   <body>
     <div id="globe" aria-label="Globo 3D com dados simulados de localização"></div>
+    <div id="globe-fallback" hidden role="status">
+      <div class="fallback-orb" aria-hidden="true"></div>
+      <div class="fallback-message"><strong>Globo 3D indisponível</strong>Confira a conexão e o suporte a WebGL do navegador e recarregue a página.</div>
+    </div>
+    <div class="tactical-overlay" aria-hidden="true">
+      <span class="tactical-corner tl"></span>
+      <span class="tactical-corner tr"></span>
+      <span class="tactical-corner bl"></span>
+      <span class="tactical-corner br"></span>
+      <div class="tactical-reticle"></div>
+      <span class="tactical-caption">GEOINT · VISUALIZAÇÃO EXPERIMENTAL</span>
+    </div>
     <div class="hud">
       <div class="topbar">
         <div class="brand">
@@ -463,6 +1016,7 @@
           <div>
             <strong>Sentinel Atlas</strong>
             <span>GeoInt & Geofencing Platform · v0.2</span>
+            <small>COMMAND CENTER / ATLAS</small>
           </div>
         </div>
         <div class="tools">
@@ -470,10 +1024,83 @@
             <input id="asset-search" type="search" placeholder="⌕ Buscar ativo ou cidade... (/)" aria-label="Buscar ativo ou cidade" aria-keyshortcuts="/" />
             <span id="search-feedback" aria-live="polite">TODOS</span>
           </div>
-          <div id="api-status" class="panel status">DEMONSTRAÇÃO · dados simulados</div>
+          <div id="api-status" class="panel status" role="status" aria-live="polite">DEMONSTRAÇÃO · dados simulados</div>
+          <button id="focus-mode" aria-pressed="false" title="Ocultar painéis para ampliar a visualização do globo">◫ Tela limpa</button>
         </div>
       </div>
 
+      <section id="geoint-panel" class="panel geoint-sources-panel" hidden aria-label="Catálogo de fontes geoespaciais">
+        <div class="geoint-panel-header">
+          <strong>🌍 Fontes GeoINT · 16 categorias</strong>
+          <button id="geoint-close" type="button" aria-label="Fechar fontes">✕</button>
+        </div>
+        <p class="geoint-note">Consulte uma fonte de cada vez, com o centro atual do globo como referência. Não são dados de vigilância pessoal.</p>
+        <label for="geoint-uf" class="geoint-note">UF para consulta de municípios IBGE:
+          <select id="geoint-uf">
+            <option value="">Escolha o estado</option>
+            <option value="AC">AC</option><option value="AL">AL</option>
+            <option value="AP">AP</option><option value="AM">AM</option>
+            <option value="BA">BA</option><option value="CE">CE</option>
+            <option value="DF">DF</option><option value="ES">ES</option>
+            <option value="GO">GO</option><option value="MA">MA</option>
+            <option value="MT">MT</option><option value="MS">MS</option>
+            <option value="MG">MG</option><option value="PA">PA</option>
+            <option value="PB">PB</option><option value="PR">PR</option>
+            <option value="PE">PE</option><option value="PI">PI</option>
+            <option value="RJ">RJ</option><option value="RN">RN</option>
+            <option value="RS">RS</option><option value="RO">RO</option>
+            <option value="RR">RR</option><option value="SC">SC</option>
+            <option value="SP">SP</option><option value="SE">SE</option>
+            <option value="TO">TO</option>
+          </select>
+        </label>
+        <div id="geoint-status" class="geoint-status" role="status" aria-live="polite">Fontes aguardando conexão com a API.</div>
+        <div id="geoint-source-list" class="geoint-source-list"></div>
+      </section>
+      <section id="weather-panel" class="panel weather-panel" hidden aria-label="Dados meteorológicos e eventos naturais">
+        <div class="weather-header">
+          <strong>☁ Meteorologia &amp; eventos</strong>
+          <button id="weather-close" type="button" aria-label="Fechar meteorologia">✕</button>
+        </div>
+        <p class="weather-note">Consultas apenas por clique. Open-Meteo fornece valores modelados; NASA informa eventos catalogados. Nenhuma camada é radar ao vivo.</p>
+        <label class="weather-note" for="weather-source">Fonte geográfica
+          <select id="weather-source">
+            <option value="weather">Tempo · Open-Meteo (modelo)</option>
+            <option value="air_quality">Qualidade do ar · Open-Meteo (modelo)</option>
+            <option value="extreme_events">Eventos naturais · NASA EONET (global)</option>
+            <option value="wildfires">Focos de calor · NASA FIRMS (com chave)</option>
+          </select>
+        </label>
+        <div class="weather-actions">
+          <button id="weather-fetch" type="button">Consultar centro do globo</button>
+          <button id="weather-clear" type="button">Limpar dados</button>
+        </div>
+        <div id="weather-status" class="weather-status" role="status" aria-live="polite">Selecione uma fonte e consulte quando desejar.</div>
+        <div id="weather-metrics" class="weather-metrics" aria-label="Medições da fonte"></div>
+        <ol id="weather-events" class="weather-events" aria-label="Eventos catalogados"></ol>
+        <p class="weather-note">A posição consultada é a câmera do globo, não o GPS do visitante. Valores climáticos variam conforme atualização e cobertura do provedor.</p>
+      </section>
+      <section id="google-places-panel" class="panel google-places-panel" aria-label="Lugares próximos pelo Google Maps">
+        <h2>Google Maps · Locais próximos</h2>
+        <p>Selecione uma categoria e consulte o entorno do centro do mapa. Consultas podem gerar custos na sua conta Google Cloud.</p>
+        <div class="google-places-actions">
+          <label for="google-places-category" class="control-label">Categoria</label>
+          <select id="google-places-category">
+            <option value="restaurant">Restaurantes</option>
+            <option value="hospital">Hospitais</option>
+            <option value="pharmacy">Farmácias</option>
+            <option value="supermarket">Supermercados</option>
+            <option value="school">Escolas</option>
+            <option value="gas_station">Postos de combustível</option>
+            <option value="tourist_attraction">Atrações turísticas</option>
+          </select>
+          <button id="google-places-search" type="button">🔍 Buscar nesta área</button>
+          <button id="google-places-clear" type="button">Limpar</button>
+        </div>
+        <div id="google-places-status" role="status" aria-live="polite">Google Places opcional · nenhuma consulta realizada.</div>
+        <ol id="google-places-results" aria-label="Resultados do Google Places"></ol>
+        <p>Fonte: Google Maps Platform / Places API (New). Informações apresentadas apenas no mapa do Google.</p>
+      </section>
       <div class="compass-hud panel">
         <div id="compass-dir" class="compass-ring">N</div>
         <div>
@@ -482,23 +1109,24 @@
         </div>
       </div>
 
-      <aside class="panel overview-panel" aria-label="Resumo operacional">
-        <div class="overview-heading">
-          <span>Resumo operacional</span>
+      <details id="overview-panel" class="panel overview-panel" aria-label="Resumo operacional" open>
+        <summary class="overview-heading">
+          <span class="overview-title-full">Resumo operacional</span>
+          <span class="overview-title-short">Resumo</span>
           <span class="overview-live">DEMO</span>
-        </div>
+        </summary>
         <div class="overview-grid">
-          <div class="overview-stat"><span>Ativos no painel</span><strong id="overview-assets">07</strong></div>
-          <div class="overview-stat"><span>Geofences</span><strong id="overview-geofences" class="green">02</strong></div>
-          <div class="overview-stat"><span>Camadas</span><strong>06</strong></div>
-          <div class="overview-stat"><span>API</span><strong id="overview-api" class="green">SIM</strong></div>
+          <div class="overview-stat"><span>Itens no painel</span><strong id="overview-assets">--</strong></div>
+          <div class="overview-stat"><span>Geofences</span><strong id="overview-geofences" class="green">--</strong></div>
+          <div class="overview-stat"><span>Categorias GeoINT</span><strong>16</strong></div>
+          <div class="overview-stat"><span>API</span><strong id="overview-api" aria-live="polite">--</strong></div>
         </div>
         <div class="overview-divider"></div>
-        <div class="overview-row"><span>Globo 3D</span><b>ATIVO</b></div>
+        <div class="overview-row"><span>Globo 3D</span><b id="overview-globe">AGUARDANDO</b></div>
         <div class="overview-row"><span>Fontes externas</span><b>OPCIONAIS</b></div>
-        <div class="overview-row"><span>Modo de operação</span><b>SIMULAÇÃO</b></div>
-        <div class="overview-foot">SENTINEL / ATLAS<br>VISUALIZAÇÃO GEOESPACIAL</div>
-      </aside>
+        <div class="overview-row"><span>Dados</span><b>DEMO + FONTES</b></div>
+        <div class="overview-foot">Algumas camadas são simuladas; fontes externas dependem de configuração.</div>
+      </details>
 
       <div id="inspector" class="panel inspector" hidden></div>
 
@@ -524,19 +1152,53 @@
       </div>
 
       <div class="bottombar">
-        <div class="panel filters" aria-label="Filtros de camadas">
-          <button class="active" data-layer="all">Tudo <span id="cnt-all" class="badge">0</span></button>
-          <button data-layer="aircraft">Aviões <span id="cnt-aircraft" class="badge">0</span></button>
-          <button data-layer="ship">Navios <span id="cnt-ship" class="badge">0</span></button>
-          <button data-layer="satellite">Satélites <span id="cnt-satellite" class="badge">0</span></button>
-          <button data-layer="traffic">Trânsito <span id="cnt-traffic" class="badge">0</span></button>
-          <button data-layer="earthquake">Terremotos <span id="cnt-earthquake" class="badge">0</span></button>
-          <button data-layer="geofence">Geofences <span id="cnt-geofence" class="badge">0</span></button>
+        <div class="panel control-deck">
+          <div class="control-row">
+            <span class="control-label">Camadas</span>
+            <div class="filters" role="group" aria-label="Filtros de camadas">
+          <button class="active" data-layer="all" aria-pressed="true">Tudo <span id="cnt-all" class="badge">0</span></button>
+          <button data-layer="aircraft" aria-pressed="false">Aviões <span id="cnt-aircraft" class="badge">0</span></button>
+          <button data-layer="ship" aria-pressed="false">Navios <span id="cnt-ship" class="badge">0</span></button>
+          <button data-layer="satellite" aria-pressed="false">Satélites <span id="cnt-satellite" class="badge">0</span></button>
+          <button data-layer="traffic" aria-pressed="false">Trânsito <span id="cnt-traffic" class="badge">0</span></button>
+          <button data-layer="earthquake" aria-pressed="false">Terremotos <span id="cnt-earthquake" class="badge">0</span></button>
+          <button data-layer="geofence" aria-pressed="false">Geofences <span id="cnt-geofence" class="badge">0</span></button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="control-label">Ferramentas</span>
+            <div class="tool-actions" role="group" aria-label="Ferramentas do mapa">
           <button id="my-location">📍 Minha localização</button>
           <button id="replay-history">⏱️ Histórico</button>
-          <button id="texture-toggle">☀️ Luz do dia</button>
-          <button id="map-view">🛰️ Mapa satélite</button>
+          <button id="texture-toggle">🌙 Luz noturna</button>
+          <label class="render-quality-control" for="render-quality">Detalhes
+            <select id="render-quality" title="Qualidade de renderização do globo">
+              <option value="auto">Automático</option>
+              <option value="ultra">Ultra · 3D</option>
+              <option value="balanced">Equilibrado</option>
+              <option value="eco">Econômico</option>
+            </select>
+          </label>
+          <button id="rotation-toggle" aria-pressed="true" title="Controlar o giro automático do globo">⏸️ Pausar giro</button>
+          <button id="reset-camera" title="Recentralizar o globo em uma visão global">🎯 Visão global</button>
+          <button id="map-view" aria-pressed="false">🛰️ Mapa satélite</button>
+          <label class="camera-control" for="camera-destination">Destino
+            <select id="camera-destination" aria-label="Região para sobrevoo">
+              <option value="natal">Natal · RN</option>
+              <option value="recife">Recife · PE</option>
+              <option value="brasilia">Brasília · DF</option>
+              <option value="saopaulo">São Paulo · SP</option>
+              <option value="rio">Rio de Janeiro · RJ</option>
+            </select>
+          </label>
+          <button id="camera-go" type="button" title="Sobrevoar o destino escolhido no globo">✈ Sobrevoar</button>
+          <button id="google-3d-view" type="button" aria-pressed="false" title="Visão fotorrealista oficial do Google Maps; pode gerar custos de API">🏙️ Google 3D</button>
+          <button id="weather-toggle" type="button" aria-expanded="false" aria-controls="weather-panel">☁ Meteorologia</button>
+          <span id="solar-status" class="solar-caption" title="Posição solar estimada pelo horário UTC">☀ Sol UTC · estimado</span>
+          <button id="toggle-geoint" type="button" aria-expanded="false" aria-controls="geoint-panel">🌐 Fontes GeoINT</button>
           <button id="toggle-ai" style="border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,0.15);">🤖 Copiloto IA</button>
+            </div>
+          </div>
         </div>
         <div class="panel legend">
           <span>Aviões</span>
@@ -549,7 +1211,56 @@
       </div>
     </div>
     <div id="map" aria-label="Mapa Google com imagens de satélite e trânsito"></div>
+    <div id="map-3d" aria-label="Mapa Google 3D fotorrealista"></div>
+    <div id="google3d-toolbar" role="group" aria-label="Navegação no Google 3D">
+      <button type="button" id="google3d-zoom-in" title="Aproximar a câmera Google 3D">＋ Aproximar</button>
+      <button type="button" id="google3d-zoom-out" title="Afastar a câmera Google 3D">－ Afastar</button>
+      <button type="button" id="google3d-rotate" title="Girar a câmera Google 3D">↻ Girar</button>
+    </div>
     <script>
+      // Modo de visualização imersiva: mantém a saída acessível pelo botão superior.
+      const focusModeButton = document.getElementById('focus-mode');
+      function setFocusMode(enabled) {
+        document.body.classList.toggle('focus-mode', enabled);
+        focusModeButton.setAttribute('aria-pressed', String(enabled));
+        focusModeButton.textContent = enabled ? '▦ Mostrar painel' : '◫ Tela limpa';
+        focusModeButton.title = enabled ? 'Restaurar painéis e ferramentas' : 'Ocultar painéis para ampliar a visualização';
+      }
+      focusModeButton.addEventListener('click', () => {
+        setFocusMode(!document.body.classList.contains('focus-mode'));
+      });
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && document.body.classList.contains('focus-mode')) {
+          setFocusMode(false);
+        }
+      });
+
+      // No celular, o resumo começa recolhido para preservar espaço para o mapa.
+      const overviewPanel = document.getElementById('overview-panel');
+      const compactLayout = window.matchMedia('(max-width: 900px)');
+      overviewPanel.open = !compactLayout.matches;
+      compactLayout.addEventListener?.('change', event => { overviewPanel.open = !event.matches; });
+
+      // Aproximação astronômica (NOAA) da posição subsolar em UTC;
+      // não são dados meteorológicos ou medições de satélite.
+      function estimateSubsolarPoint(date) {
+        const day = Math.floor((Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) -
+          Date.UTC(date.getUTCFullYear(), 0, 0)) / 86400000);
+        const minutes = date.getUTCHours() * 60 + date.getUTCMinutes() +
+          date.getUTCSeconds() / 60;
+        const gamma = (2 * Math.PI / 365) * (day - 1 + (minutes / 60 - 12) / 24);
+        const equationOfTime = 229.18 * (0.000075 + 0.001868 * Math.cos(gamma) -
+          0.032077 * Math.sin(gamma) - 0.014615 * Math.cos(2 * gamma) -
+          0.040849 * Math.sin(2 * gamma));
+        const declination = 0.006918 - 0.399912 * Math.cos(gamma) +
+          0.070257 * Math.sin(gamma) - 0.006758 * Math.cos(2 * gamma) +
+          0.000907 * Math.sin(2 * gamma) - 0.002697 * Math.cos(3 * gamma) +
+          0.00148 * Math.sin(3 * gamma);
+        const longitude = 180 - (minutes + equationOfTime) / 4;
+        return { lat: declination * 180 / Math.PI, lng: ((longitude + 540) % 360) - 180 };
+      }
+
+      function initializeSentinel() {
       const assets = [
         { id:'flight-1', type:'aircraft', label:'JJ 3812 · São Paulo', lat:-23.55, lng:-46.63, color:'#38bdf8', altitude:0.04 },
         { id:'flight-2', type:'aircraft', label:'AD 4520 · Recife', lat:-8.05, lng:-34.9, color:'#38bdf8', altitude:0.04 },
@@ -607,11 +1318,16 @@
 
       const earthquakeSource = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson';
       let googleMap;
+      let googleMap3D;
+      let googleMapsLoadPromise;
+      let googlePlaceMarkers = [];
+      let googlePlacesInfoWindow;
+      let googlePlacesSearchSequence = 0;
       const textures = {
         night: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-night.jpg',
         day: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-blue-marble.jpg',
       };
-      let currentTexture = 'night';
+      let currentTexture = 'day';
       let replayTimer;
       let positionSocket;
 
@@ -640,7 +1356,11 @@
         }
         assets.push(...incoming);
         const activeFilter = document.querySelector('[data-layer].active')?.dataset.layer || 'all';
-        globe.pointsData(getFilteredPoints(activeFilter));
+        if (document.getElementById('asset-search')?.value.trim()) {
+          applyAssetSearch();
+        } else {
+          globe.pointsData(getFilteredPoints(activeFilter));
+        }
         updateBadges();
       }
 
@@ -689,7 +1409,7 @@
         .backgroundImageUrl('https://unpkg.com/three-globe@2.43.0/example/img/night-sky.png')
         .showAtmosphere(true)
         .atmosphereColor('#38bdf8')
-        .atmosphereAltitude(0.25)
+        .atmosphereAltitude(0.18)
         .pointLat('lat').pointLng('lng').pointAltitude('altitude').pointColor('color').pointRadius(0.5)
         .pointLabel(d => `<div style="background:rgba(15,23,42,0.92);padding:6px 10px;border-radius:8px;border:1px solid rgba(56,189,248,0.35);font-family:sans-serif;font-size:12px;box-shadow:0 8px 16px rgba(0,0,0,0.5);"><b>${escapeHtml(d.label)}</b><br><span style="color:#94a3b8;font-size:10px;">${escapeHtml(d.type === 'earthquake' ? 'USGS · Fonte Pública' : String(d.type).toUpperCase() + ' · Ativo Tático')}</span></div>`)
         .onPointClick(asset => {
@@ -772,40 +1492,261 @@
         .ringPropagationSpeed('propagationSpeed').ringRepeatPeriod('repeatPeriod')
         .pointsData(getFilteredPoints('all'));
 
-      // Ajuste de brilho e brilho especular do oceano no material do Three.js
+      // Iluminação solar dinâmica, aproximada com base na data/hora UTC.
       const globeMaterial = globe.globeMaterial();
-      if (globeMaterial) {
-        globeMaterial.bumpScale = 12;
-        if (window.THREE) {
-          globeMaterial.specular = new THREE.Color('#38bdf8');
-          globeMaterial.shininess = 20;
+      let cloudsMesh = null;
+      let cityLightsMesh = null;
+      let cityLightsRequested = false;
+      let solarLight = null;
+      if (window.THREE) {
+        try {
+          const sun = new THREE.DirectionalLight(0xfff0d8, 2.0);
+          solarLight = sun;
+          const skyBounce = new THREE.AmbientLight(0x87aec6, 0.27);
+          globe.lights?.([skyBounce, sun]);
+          function refreshSolarLight() {
+            const point = estimateSubsolarPoint(new Date());
+            const vector = globe.getCoords(point.lat, point.lng, 10);
+            sun.position.set(vector.x, vector.y, vector.z);
+            if (cityLightsMesh) {
+              cityLightsMesh.material.uniforms.sunVector.value.copy(sun.position).normalize();
+            }
+            const label = document.getElementById('solar-status');
+            if (label) label.textContent = '☀ Sol UTC · ' +
+              point.lat.toFixed(1) + '°, ' + point.lng.toFixed(1) + '°';
+          }
+          refreshSolarLight();
+          setInterval(() => { if (!document.hidden) refreshSolarLight(); }, 60000);
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) refreshSolarLight();
+          });
+          if (globeMaterial) {
+            globeMaterial.specular = new THREE.Color('#9eb5c5');
+            globeMaterial.shininess = 35;
+            // Refletividade dos oceanos, sem forçar brilho nas massas de terra.
+            new THREE.TextureLoader().load(
+              'https://unpkg.com/three-globe@2.43.0/example/img/earth-water.png',
+              texture => {
+                globeMaterial.specularMap = texture;
+                globeMaterial.needsUpdate = true;
+              },
+              undefined,
+              () => console.info('Textura oceânica indisponível; globo segue funcional.')
+            );
+          }
+          const webglRenderer = globe.renderer?.();
+          if (webglRenderer && THREE.ACESFilmicToneMapping !== undefined) {
+            webglRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+            webglRenderer.toneMappingExposure = 1.05;
+          }
+        } catch (error) {
+          console.info('Iluminação solar avançada indisponível; mantendo padrão.', error);
         }
       }
 
-      // Adicionar camada de nuvens 3D flutuantes com rotação independente
-      if (window.THREE) {
-        new THREE.TextureLoader().load('https://unpkg.com/three-globe@2.43.0/example/img/clouds.png', cloudsTexture => {
-          const clouds = new THREE.Mesh(
-            new THREE.SphereGeometry(globe.getGlobeRadius() * 1.012, 64, 64),
-            new THREE.MeshPhongMaterial({
-              map: cloudsTexture,
+      // Luzes urbanas noturnas renderizadas sobre a metade escura do globo.
+      // Usamos a textura pública de luzes terrestres do globo, nunca tiles Google.
+      // O shader e a geometria são opcionais e desligados no perfil Econômico.
+      function loadCityLights() {
+        if (!window.THREE || cityLightsRequested) return;
+        cityLightsRequested = true;
+        new THREE.TextureLoader().load(textures.night, image => {
+          try {
+            if (THREE.SRGBColorSpace) image.colorSpace = THREE.SRGBColorSpace;
+            const material = new THREE.ShaderMaterial({
+              uniforms: {
+                cityTexture: { value: image },
+                sunVector: { value: new THREE.Vector3(1, 0, 0) }
+              },
+              vertexShader: `
+                varying vec2 vCityUv;
+                varying vec3 vNormalWorld;
+                void main() {
+                  vCityUv = uv;
+                  vNormalWorld = normalize(mat3(modelMatrix) * normal);
+                  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+              `,
+              fragmentShader: `
+                uniform sampler2D cityTexture;
+                uniform vec3 sunVector;
+                varying vec2 vCityUv;
+                varying vec3 vNormalWorld;
+                void main() {
+                  vec3 image = texture2D(cityTexture, vCityUv).rgb;
+                  float sunlight = dot(normalize(vNormalWorld), normalize(sunVector));
+                  float darkness = 1.0 - smoothstep(-0.2, 0.25, sunlight);
+                  float brightness = max(max(image.r, image.g), image.b);
+                  float glow = darkness * smoothstep(0.035, 0.58, brightness);
+                  gl_FragColor = vec4(image * 1.25, glow * 0.7);
+                }
+              `,
+              blending: THREE.AdditiveBlending,
               transparent: true,
-              opacity: 0.38,
-              depthWrite: false
-            })
-          );
-          globe.scene().add(clouds);
-
-          (function rotateClouds() {
-            clouds.rotation.y += 0.0002;
-            requestAnimationFrame(rotateClouds);
-          })();
-        });
+              depthWrite: false,
+              side: THREE.FrontSide
+            });
+            const geometry = new THREE.SphereGeometry(globe.getGlobeRadius() * 1.002, 96, 64);
+            cityLightsMesh = new THREE.Mesh(geometry, material);
+            if (solarLight) {
+              cityLightsMesh.material.uniforms.sunVector.value.copy(solarLight.position).normalize();
+            }
+            globe.scene().add(cityLightsMesh);
+            applyRenderQuality();
+          } catch (error) {
+            console.info('Luzes urbanas indisponíveis; globo mantém textura diurna.', error);
+          }
+        }, undefined, () => console.info('Textura noturna indisponível; não há luzes urbanas.'));
       }
 
-      globe.controls().autoRotate = true;
+      // Nuvens independentes carregadas sob demanda (evita gastar dados no modo Econômico).
+      let cloudsRequested = false;
+      function loadClouds() {
+        if (!window.THREE || cloudsRequested) return;
+        cloudsRequested = true;
+        new THREE.TextureLoader().load(
+          'https://raw.githubusercontent.com/vasturiano/globe.gl/master/example/clouds/clouds.png',
+          cloudsTexture => {
+            cloudsMesh = new THREE.Mesh(
+              new THREE.SphereGeometry(globe.getGlobeRadius() * 1.006, 96, 96),
+              new THREE.MeshPhongMaterial({
+                map: cloudsTexture,
+                transparent: true,
+                opacity: 0.27,
+                depthWrite: false,
+                side: THREE.FrontSide
+              })
+            );
+            globe.scene().add(cloudsMesh);
+            applyRenderQuality();
+
+            (function rotateClouds() {
+              if (cloudsMesh?.visible && rotationRequested && !document.hidden &&
+                  !document.body.classList.contains('map-mode')) {
+                cloudsMesh.rotation.y += 0.00012;
+              }
+              requestAnimationFrame(rotateClouds);
+            })();
+          },
+          undefined,
+          () => console.info('Textura de nuvens indisponível; globo continua operando.')
+        );
+      }
+
       globe.controls().autoRotateSpeed = 0.25;
       globe.controls().enableDamping = true;
+
+      const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const renderQualityControl = document.getElementById('render-quality');
+
+      function getRenderProfile(requested, devicePixelRatio = 1, compact = false, reducedMotion = false, memoryGb = 4, cpuCores = 4) {
+        const modes = {
+          ultra: { dpr: 2, curvature: 1.5, points: 18, arcSegments: 96, arcRadial: 10, atmosphere: .15, bump: 1.2, clouds: true, opacity: .26 },
+          balanced: { dpr: 1.5, curvature: 3, points: 12, arcSegments: 64, arcRadial: 6, atmosphere: .13, bump: .85, clouds: true, opacity: .20 },
+          eco: { dpr: 1, curvature: 6, points: 6, arcSegments: 30, arcRadial: 4, atmosphere: .10, bump: .35, clouds: false, opacity: 0 }
+        };
+        const powerfulDesktop = !compact && !reducedMotion &&
+          Number(memoryGb) >= 8 && Number(cpuCores) >= 8;
+        const resolved = requested === 'auto'
+          ? (compact || reducedMotion ? 'eco' : (powerfulDesktop ? 'ultra' : 'balanced'))
+          : (Object.hasOwn(modes, requested) ? requested : 'balanced');
+        const profile = modes[resolved];
+        return { ...profile, mode: resolved, pixelRatio: Math.min(Math.max(Number(devicePixelRatio) || 1, 1), profile.dpr) };
+      }
+
+      function applyRenderQuality() {
+        const profile = getRenderProfile(
+          renderQualityControl.value,
+          window.devicePixelRatio || 1,
+          window.matchMedia('(max-width: 768px)').matches,
+          motionPreference.matches,
+          navigator.deviceMemory ?? 4,
+          navigator.hardwareConcurrency ?? 4
+        );
+        // Os métodos são opcionais para manter compatibilidade com versões antigas da biblioteca.
+        const renderer = globe.renderer?.();
+        renderer?.setPixelRatio?.(profile.pixelRatio);
+        globe.globeCurvatureResolution?.(profile.curvature);
+        globe.pointResolution?.(profile.points);
+        globe.arcCurveResolution?.(profile.arcSegments);
+        globe.arcCircularResolution?.(profile.arcRadial);
+        globe.atmosphereAltitude?.(profile.atmosphere);
+        if (globeMaterial) {
+          globeMaterial.bumpScale = profile.bump;
+          globeMaterial.needsUpdate = true;
+        }
+        if (profile.clouds) {
+          loadClouds();
+          loadCityLights();
+        }
+        if (cityLightsMesh) cityLightsMesh.visible =
+          profile.mode !== 'eco' && currentTexture === 'day';
+        if (cloudsMesh) {
+          cloudsMesh.visible = profile.clouds;
+          cloudsMesh.material.opacity = profile.opacity;
+        }
+        renderQualityControl.dataset.resolved = profile.mode;
+        renderQualityControl.title = 'Qualidade ativa: ' + profile.mode +
+          ' · resolução ' + profile.pixelRatio.toFixed(2) + '×';
+      }
+      renderQualityControl.addEventListener('change', applyRenderQuality);
+      motionPreference.addEventListener?.('change', () => {
+        if (renderQualityControl.value === 'auto') applyRenderQuality();
+      });
+      window.addEventListener('resize', () => {
+        if (renderQualityControl.value === 'auto') applyRenderQuality();
+      });
+      applyRenderQuality();
+
+      const rotationToggle = document.getElementById('rotation-toggle');
+      let rotationRequested = !motionPreference.matches;
+
+      function updateRotation() {
+        globe.controls().autoRotate = rotationRequested &&
+          !document.hidden && !document.body.classList.contains('map-mode');
+        rotationToggle.setAttribute('aria-pressed', String(rotationRequested));
+        rotationToggle.textContent = rotationRequested ? '⏸️ Pausar giro' : '▶️ Retomar giro';
+      }
+
+      rotationToggle.addEventListener('click', () => {
+        rotationRequested = !rotationRequested;
+        updateRotation();
+      });
+      document.addEventListener('visibilitychange', updateRotation);
+      motionPreference.addEventListener?.('change', event => {
+        rotationRequested = !event.matches;
+        updateRotation();
+      });
+      updateRotation();
+
+      function resetGlobalView() {
+        setMapView(false);
+        globe.pointOfView({ lat: 0, lng: -30, altitude: 2.5 }, 900);
+        document.getElementById('inspector').hidden = true;
+      }
+      document.getElementById('reset-camera').addEventListener('click', resetGlobalView);
+
+      // Coordenadas estáticas de atalhos; não são dados de trânsito/localização pessoal.
+      const cameraDestinations = Object.freeze({
+        natal: { lat: -5.7945, lng: -35.211, label: 'Natal · RN' },
+        recife: { lat: -8.0543, lng: -34.8813, label: 'Recife · PE' },
+        brasilia: { lat: -15.7939, lng: -47.8828, label: 'Brasília · DF' },
+        saopaulo: { lat: -23.5505, lng: -46.6333, label: 'São Paulo · SP' },
+        rio: { lat: -22.9068, lng: -43.1729, label: 'Rio de Janeiro · RJ' }
+      });
+      function flyToDestination(key) {
+        if (!Object.hasOwn(cameraDestinations, key)) return false;
+        const selected = cameraDestinations[key];
+        setMapView(false);
+        globe.pointOfView({ lat: selected.lat, lng: selected.lng, altitude: .46 },
+          motionPreference.matches ? 0 : 1700);
+        document.getElementById('api-status').textContent =
+          'SOBREVOO · ' + selected.label + ' · coordenadas de referência';
+        return true;
+      }
+      document.getElementById('camera-go').addEventListener('click', () => {
+        flyToDestination(document.getElementById('camera-destination').value);
+      });
 
       // Atualiza bússola e coordenadas HUD no movimento da câmera
       function updateHUD() {
@@ -818,8 +1759,12 @@
       setInterval(updateHUD, 500);
 
       document.querySelectorAll('[data-layer]').forEach(button => button.addEventListener('click', () => {
-        document.querySelectorAll('[data-layer]').forEach(item => item.classList.remove('active'));
+        document.querySelectorAll('[data-layer]').forEach(item => {
+          item.classList.remove('active');
+          item.setAttribute('aria-pressed', 'false');
+        });
         button.classList.add('active');
+        button.setAttribute('aria-pressed', 'true');
         const layer = button.dataset.layer;
         if (typeof assetSearchInput !== 'undefined' && assetSearchInput.value.trim()) {
           applyAssetSearch();
@@ -835,10 +1780,12 @@
           const res = await fetch('/api/geofences');
           if (res.ok) {
             const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
+            if (Array.isArray(data)) {
+              // Uma lista vazia significa zero áreas cadastradas, não geofences simuladas.
               loadedGeofences = data;
               globe.ringsData(buildRingsData());
               updateBadges();
+              applyAssetSearch();
             }
           }
         } catch (e) {
@@ -883,7 +1830,9 @@
       document.getElementById('texture-toggle').addEventListener('click', event => {
         currentTexture = currentTexture === 'night' ? 'day' : 'night';
         globe.globeImageUrl(textures[currentTexture]);
-        event.currentTarget.innerHTML = currentTexture === 'night' ? '☀️ Luz do dia' : '🌙 Luz noturna';
+        if (cityLightsMesh) cityLightsMesh.visible =
+          currentTexture === 'day' && renderQualityControl.dataset.resolved !== 'eco';
+        event.currentTarget.textContent = currentTexture === 'night' ? '☀️ Luz do dia' : '🌙 Luz noturna';
       });
 
       async function replayHistory() {
@@ -954,11 +1903,14 @@
         }
 
         const matchingAssets = assets.filter(asset =>
-          asset.label.toLocaleLowerCase('pt-BR').includes(query) ||
-          asset.type.toLocaleLowerCase('pt-BR').includes(query) ||
-          asset.id.toLocaleLowerCase('pt-BR').includes(query)
+          (activeLayer === 'all' || asset.type === activeLayer) &&
+          (asset.label.toLocaleLowerCase('pt-BR').includes(query) ||
+           asset.type.toLocaleLowerCase('pt-BR').includes(query) ||
+           asset.id.toLocaleLowerCase('pt-BR').includes(query))
         );
-        const matchingFences = loadedGeofences
+        const visibleFences = activeLayer === 'all' || activeLayer === 'geofence'
+          ? loadedGeofences : [];
+        const matchingFences = visibleFences
           .filter(fence => fence.name.toLocaleLowerCase('pt-BR').includes(query))
           .map(fence => ({
             id: `gf-${fence.name}`, type: 'geofence',
@@ -1072,41 +2024,679 @@
         try {
           const response = await fetch('/api/health', { headers: { Accept: 'application/json' } });
           if (!response.ok) throw new Error('API indisponível');
-          const data = await response.json();
-          status.textContent = `API ONLINE · ${new Date(data.timestamp * 1000).toLocaleTimeString()}`;
+          await response.json();
+          if (status.textContent !== 'API ONLINE · DADOS MISTOS') status.textContent = 'API ONLINE · DADOS MISTOS';
+          const overview = document.getElementById('overview-api');
+          if (overview.textContent !== 'ON') overview.textContent = 'ON';
+          overview.classList.add('green');
         } catch {
-          status.textContent = 'DEMONSTRAÇÃO · API não conectada';
+          if (status.textContent !== 'DEMONSTRAÇÃO · API não conectada') status.textContent = 'DEMONSTRAÇÃO · API não conectada';
+          const overview = document.getElementById('overview-api');
+          if (overview.textContent !== 'OFF') overview.textContent = 'OFF';
+          overview.classList.remove('green');
         }
       }
       refreshApiStatus();
       setInterval(refreshApiStatus, 30000);
 
-      async function openSatelliteMap() {
-        const status = document.getElementById('api-status');
-        try {
-          const configResponse = await fetch('/api/public-config');
-          const config = await configResponse.json();
-          if (!config.google_maps_api_key) throw new Error('adicione GOOGLE_MAPS_API_KEY no .env');
-          if (!window.google?.maps) {
-            await new Promise((resolve, reject) => {
-              const script = document.createElement('script');
-              script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(config.google_maps_api_key)}`;
-              script.onload = resolve;
-              script.onerror = () => reject(new Error('Google Maps indisponível'));
-              document.head.appendChild(script);
-            });
-          }
-          googleMap ??= new google.maps.Map(document.getElementById('map'), {
-            center: { lat: -23.5505, lng: -46.6333 }, zoom: 11, mapTypeId: 'satellite',
+      // A API JavaScript usa uma chave de navegador restrita por domínio e serviço.
+      // Não confundir com SENTINEL_API_TOKEN, que nunca vai para o navegador.
+      async function loadGoogleMaps(apiKey) {
+        if (window.google?.maps?.Map) return;
+        if (!googleMapsLoadPromise) {
+          googleMapsLoadPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.async = true;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&language=pt-BR&region=BR`;
+            script.onload = () => window.google?.maps?.Map
+              ? resolve()
+              : reject(new Error('A biblioteca do Google Maps não inicializou.'));
+            script.onerror = () => reject(new Error('Não foi possível carregar o Google Maps.'));
+            document.head.appendChild(script);
+          }).catch(error => {
+            googleMapsLoadPromise = undefined;
+            throw error;
           });
-          new google.maps.TrafficLayer().setMap(googleMap);
-          document.body.classList.add('map-mode');
-          status.textContent = 'GOOGLE MAPS · satélite + trânsito';
-        } catch (error) {
-          status.textContent = `MAPA 2D INDISPONÍVEL · ${error.message}`;
+        }
+        return googleMapsLoadPromise;
+      }
+
+      const googlePlacesTypes = new Set([
+        'restaurant', 'hospital', 'pharmacy', 'supermarket', 'school',
+        'gas_station', 'tourist_attraction'
+      ]);
+
+      function buildNearbySearchRequest(type, center, radius = 1500) {
+        const lat = Number(center?.lat);
+        const lng = Number(center?.lng);
+        if (!googlePlacesTypes.has(type)) throw new Error('Categoria de lugares não permitida.');
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+            Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+          throw new Error('Centro do mapa inválido.');
+        }
+        return {
+          fields: ['displayName', 'location', 'formattedAddress', 'googleMapsURI'],
+          locationRestriction: {
+            center: { lat, lng },
+            radius: Math.max(100, Math.min(5000, Number(radius) || 1500))
+          },
+          includedPrimaryTypes: [type],
+          maxResultCount: 8
+        };
+      }
+
+      function googleMapsLink(uri) {
+        try {
+          const parsed = new URL(uri);
+          if (parsed.protocol !== 'https:' ||
+              !['google.com', 'www.google.com', 'maps.google.com'].includes(parsed.hostname)) {
+            return null;
+          }
+          return parsed.href;
+        } catch {
+          return null;
         }
       }
-      document.getElementById('map-view').addEventListener('click', openSatelliteMap);
+
+      function clearGooglePlacesResults() {
+        googlePlacesSearchSequence += 1; // Invalida buscas concorrentes em andamento.
+        googlePlaceMarkers.forEach(marker => marker.setMap(null));
+        googlePlaceMarkers = [];
+        googlePlacesInfoWindow?.close();
+        document.getElementById('google-places-results').replaceChildren();
+        document.getElementById('google-places-status').textContent =
+          'Resultados limpos. Faça uma busca quando desejar.';
+      }
+
+      async function searchGooglePlacesNearby() {
+        const button = document.getElementById('google-places-search');
+        const results = document.getElementById('google-places-results');
+        const status = document.getElementById('google-places-status');
+        if (!googleMap) {
+          status.textContent = 'Abra primeiro o mapa Google para consultar lugares.';
+          return;
+        }
+        const searchId = ++googlePlacesSearchSequence;
+        button.disabled = true;
+        status.textContent = 'Consultando Google Places (New)…';
+        try {
+          const { Place } = await google.maps.importLibrary('places');
+          const center = googleMap.getCenter();
+          const request = buildNearbySearchRequest(
+            document.getElementById('google-places-category').value,
+            { lat: center.lat(), lng: center.lng() }
+          );
+          // Consulta somente quando o usuário clicar; nenhum dado é salvo no servidor.
+          const { places = [] } = await Place.searchNearby(request);
+          if (searchId !== googlePlacesSearchSequence) return;
+          googlePlaceMarkers.forEach(marker => marker.setMap(null));
+          googlePlaceMarkers = [];
+          googlePlacesInfoWindow?.close();
+          results.replaceChildren();
+          if (!places.length) {
+            status.textContent = 'Nenhum local retornado para esta categoria e área.';
+            return;
+          }
+          googlePlacesInfoWindow ||= new google.maps.InfoWindow();
+          for (const place of places) {
+            if (!place.location) continue;
+            // Marcadores Legacy não exigem Map ID; ficam exclusivamente no Google Map.
+            const marker = new google.maps.Marker({
+              map: googleMap,
+              position: place.location,
+              title: place.displayName || 'Local próximo'
+            });
+            googlePlaceMarkers.push(marker);
+
+            const item = document.createElement('li');
+            const name = document.createElement('strong');
+            name.textContent = place.displayName || 'Local próximo';
+            const address = document.createElement('small');
+            address.textContent = place.formattedAddress || 'Endereço não informado';
+            const locate = document.createElement('button');
+            locate.type = 'button';
+            locate.textContent = '📍 Ver no mapa';
+            const details = document.createElement('div');
+            details.append(name, address);
+            item.append(details, locate);
+            const link = googleMapsLink(place.googleMapsURI);
+            if (link) {
+              const anchor = document.createElement('a');
+              anchor.href = link;
+              anchor.target = '_blank';
+              anchor.rel = 'noopener noreferrer';
+              anchor.textContent = 'Abrir no Google Maps';
+              item.appendChild(anchor);
+            }
+            const focus = () => {
+              googleMap.panTo(place.location);
+              googleMap.setZoom(Math.max(googleMap.getZoom() || 14, 15));
+              const info = document.createElement('div');
+              const label = document.createElement('strong');
+              label.textContent = place.displayName || 'Local próximo';
+              const line = document.createElement('p');
+              line.textContent = place.formattedAddress || 'Local identificado pelo Google Maps';
+              info.append(label, line);
+              googlePlacesInfoWindow.setContent(info);
+              googlePlacesInfoWindow.open({ map: googleMap, anchor: marker });
+            };
+            marker.addListener('click', focus);
+            locate.addEventListener('click', focus);
+            results.appendChild(item);
+          }
+          status.textContent = `Google Places · ${googlePlaceMarkers.length} local(is) nesta área.`;
+        } catch (error) {
+          if (searchId !== googlePlacesSearchSequence) return;
+          status.textContent = 'Google Places indisponível. Confira Places API (New), faturamento e restrições da chave.';
+          console.warn('Consulta Google Places não concluída:', error);
+        } finally {
+          button.disabled = false;
+        }
+      }
+      document.getElementById('google-places-search').addEventListener('click', searchGooglePlacesNearby);
+      document.getElementById('google-places-clear').addEventListener('click', clearGooglePlacesResults);
+
+      async function openSatelliteMap() {
+        const status = document.getElementById('api-status');
+        const placesStatus = document.getElementById('google-places-status');
+        try {
+          const configResponse = await fetch('/api/public-config', {
+            headers: { Accept: 'application/json' }
+          });
+          if (!configResponse.ok) throw new Error('configuração pública indisponível');
+          const config = await configResponse.json();
+          if (!config.google_maps_enabled || !config.google_maps_api_key) {
+            throw new Error('configure GOOGLE_MAPS_API_KEY com restrição por domínio');
+          }
+          await loadGoogleMaps(config.google_maps_api_key);
+          // Ao mudar do Google 3D para o 2D, preserva o centro visualizado.
+          const wasGoogle3D = document.body.classList.contains('google3d-mode');
+          const center3D = wasGoogle3D ? googleMap3D?.center : null;
+          const camera = globe.pointOfView();
+          const center = {
+            lat: Number.isFinite(center3D?.lat) ? center3D.lat :
+              (Number.isFinite(camera?.lat) ? camera.lat : -23.5505),
+            lng: Number.isFinite(center3D?.lng) ? center3D.lng :
+              (Number.isFinite(camera?.lng) ? camera.lng : -46.6333)
+          };
+          document.body.classList.remove('google3d-mode');
+          document.getElementById('google-3d-view').setAttribute('aria-pressed', 'false');
+          // Exibir primeiro: o Google Maps precisa de um contêiner visível para inicializar.
+          setMapView(true);
+          if (!googleMap) {
+            googleMap = new google.maps.Map(document.getElementById('map'), {
+              center, zoom: 13, mapTypeId: 'hybrid',
+              mapTypeControl: true, fullscreenControl: true, streetViewControl: true
+            });
+            new google.maps.TrafficLayer().setMap(googleMap);
+          } else {
+            googleMap.setCenter(center);
+          }
+          placesStatus.textContent = 'Google Maps pronto. Clique em Buscar nesta área para obter locais próximos.';
+          status.textContent = 'GOOGLE MAPS · híbrido + trânsito · Places sob demanda';
+        } catch (error) {
+          placesStatus.textContent = 'Google Maps não configurado. O globo 3D continua disponível.';
+          status.textContent = `MAPA 2D INDISPONÍVEL · ${error.message}`;
+          setMapView(false);
+        }
+      }
+      // Mostra a fotogrametria licenciada apenas no mapa oficial do Google:
+      // nenhuma imagem do Google vira textura do globo WebGL do Sentinel.
+      async function openGoogle3DMap() {
+        const status = document.getElementById('api-status');
+        try {
+          const configResponse = await fetch('/api/public-config', {
+            headers: { Accept: 'application/json' }
+          });
+          if (!configResponse.ok) throw new Error('configuração pública indisponível');
+          const config = await configResponse.json();
+          if (!config.google_maps_enabled || !config.google_maps_api_key) {
+            throw new Error('configure GOOGLE_MAPS_API_KEY com restrição por domínio');
+          }
+          await loadGoogleMaps(config.google_maps_api_key);
+          const { Map3DElement } = await google.maps.importLibrary('maps3d');
+          if (typeof Map3DElement !== 'function') {
+            throw new Error('Biblioteca Google Maps 3D indisponível');
+          }
+          const camera = globe.pointOfView();
+          const previousMapCenter = googleMap?.getCenter?.();
+          const useMapCenter = document.body.classList.contains('map-mode') &&
+            !document.body.classList.contains('google3d-mode') && previousMapCenter;
+          const center = {
+            lat: useMapCenter ? previousMapCenter.lat() : (Number.isFinite(camera?.lat) ? camera.lat : -5.7945),
+            lng: useMapCenter ? previousMapCenter.lng() : (Number.isFinite(camera?.lng) ? camera.lng : -35.211)
+          };
+          if (!googleMap3D) {
+            googleMap3D = new Map3DElement({
+              center: { ...center, altitude: 350 },
+              range: 6500,
+              tilt: 65,
+              heading: 0,
+              mode: 'HYBRID'
+            });
+            document.getElementById('map-3d').replaceChildren(googleMap3D);
+          } else {
+            googleMap3D.center = { ...center, altitude: 350 };
+          }
+          setMapView(true);
+          document.body.classList.add('google3d-mode');
+          document.getElementById('google-3d-view').setAttribute('aria-pressed', 'true');
+          status.textContent = 'GOOGLE 3D · imagens fotorrealistas quando disponíveis';
+        } catch (error) {
+          document.body.classList.remove('google3d-mode');
+          document.getElementById('google-3d-view').setAttribute('aria-pressed', 'false');
+          status.textContent = 'GOOGLE 3D INDISPONÍVEL · ' + error.message;
+          if (!googleMap) setMapView(false);
+        }
+      }
+      function adjustGoogle3DCamera(action) {
+        if (!googleMap3D || !document.body.classList.contains('google3d-mode')) return false;
+        if (action === 'zoom-in') {
+          googleMap3D.range = Math.max(300, (Number(googleMap3D.range) || 6500) * .65);
+        } else if (action === 'zoom-out') {
+          googleMap3D.range = Math.min(35000, (Number(googleMap3D.range) || 6500) * 1.5);
+        } else if (action === 'rotate') {
+          googleMap3D.heading = ((Number(googleMap3D.heading) || 0) + 45) % 360;
+        } else {
+          return false;
+        }
+        document.getElementById('api-status').textContent =
+          'GOOGLE 3D · câmera: ' + Math.round(Number(googleMap3D.range)) +
+          ' m · cobertura variável';
+        return true;
+      }
+      document.getElementById('google3d-zoom-in').addEventListener('click', () =>
+        adjustGoogle3DCamera('zoom-in'));
+      document.getElementById('google3d-zoom-out').addEventListener('click', () =>
+        adjustGoogle3DCamera('zoom-out'));
+      document.getElementById('google3d-rotate').addEventListener('click', () =>
+        adjustGoogle3DCamera('rotate'));
+
+      function setMapView(enabled) {
+        document.body.classList.toggle('map-mode', enabled);
+        if (!enabled) {
+          document.body.classList.remove('google3d-mode');
+          document.querySelector?.('#google-3d-view')?.setAttribute('aria-pressed', 'false');
+        }
+        updateRotation();
+        const button = document.getElementById('map-view');
+        button.textContent = enabled ? '🌐 Voltar ao globo' : '🛰️ Mapa satélite';
+        button.setAttribute('aria-pressed', String(enabled));
+      }
+      document.getElementById('map-view').addEventListener('click', () => {
+        if (document.body.classList.contains('google3d-mode')) {
+          openSatelliteMap();
+        } else if (document.body.classList.contains('map-mode')) {
+          setMapView(false);
+          document.getElementById('api-status').textContent = 'GLOBO 3D · visualização do painel';
+        } else {
+          openSatelliteMap();
+        }
+      });
+      document.getElementById('google-3d-view').addEventListener('click', () => {
+        if (document.body.classList.contains('google3d-mode')) {
+          setMapView(false);
+          document.getElementById('api-status').textContent = 'GLOBO 3D · visualização do painel';
+        } else {
+          openGoogle3DMap();
+        }
+      });
+
+      const geointPanel = document.getElementById('geoint-panel');
+      const geointToggle = document.getElementById('toggle-geoint');
+      const geointStatus = document.getElementById('geoint-status');
+      const geointList = document.getElementById('geoint-source-list');
+      let geointCatalog = [];
+
+      function setGeointPanel(enabled) {
+        geointPanel.hidden = !enabled;
+        geointToggle.setAttribute('aria-expanded', String(enabled));
+      }
+      geointToggle.addEventListener('click', () => {
+        setGeointPanel(geointPanel.hidden);
+        if (!geointPanel.hidden && !geointCatalog.length) loadGeointCatalog();
+      });
+      document.getElementById('geoint-close').addEventListener('click', () => setGeointPanel(false));
+
+      const geointColors = {
+        earthquakes: '#fb923c', wildfires: '#ef4444', extreme_events: '#f43f5e',
+        aircraft: '#38bdf8', orbital: '#c084fc', vessels: '#34d399',
+        weather: '#7dd3fc', air_quality: '#facc15', urban: '#86efac',
+        terrain: '#d8b4fe', transit: '#4ade80', hydrology: '#22d3ee',
+        alerts: '#f87171'
+      };
+      const geointLabel = {
+        ready: 'Pronto para consulta', needs_region: 'Selecione uma UF',
+        requires_configuration: 'Configuração necessária', external_view: 'Visualização externa',
+        ok: 'Dados consultados', empty: 'Sem dados retornados', unavailable: 'Fonte indisponível'
+      };
+
+      function safeGeointExternalLink(url) {
+        try {
+          const link = new URL(url);
+          return link.protocol === 'https:' &&
+            link.hostname === 'worldview.earthdata.nasa.gov' ? link.href : null;
+        } catch { return null; }
+      }
+
+      async function queryGeointLayer(layer, row, button, output) {
+        if (layer.id === 'traffic') {
+          if (!document.body.classList.contains('map-mode')) document.getElementById('map-view').click();
+          output.textContent = 'Trânsito: camada Google Maps. Depende da chave configurada.';
+          return;
+        }
+        if (layer.id === 'imagery') {
+          const link = safeGeointExternalLink('https://worldview.earthdata.nasa.gov/');
+          const a = document.createElement('a');
+          a.href = link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+          a.textContent = 'Abrir imagens NASA Worldview';
+          output.replaceChildren(a);
+          return;
+        }
+        if (layer.status === 'requires_configuration') {
+          output.textContent = 'Falta configurar ' + layer.requirement + ' no servidor. Não coloque chaves no navegador.';
+          return;
+        }
+        const uf = document.getElementById('geoint-uf').value;
+        if (layer.id === 'municipalities' && !uf) {
+          output.textContent = 'Selecione uma UF acima para consultar o IBGE.';
+          return;
+        }
+        button.disabled = true;
+        output.textContent = 'Consultando ' + layer.provider + '…';
+        try {
+          const camera = globe.pointOfView() || {lat: 0, lng: -30};
+          const params = new URLSearchParams({lat: String(camera.lat ?? 0), lng: String(camera.lng ?? -30)});
+          if (layer.id === 'municipalities') params.set('uf', uf);
+          const res = await fetch('/api/geoint/layers/' + encodeURIComponent(layer.id) + '?' + params, {
+            headers: {Accept: 'application/json'}
+          });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          const items = Array.isArray(data.items) ? data.items : [];
+          const latest = data.status === 'ok' ? 'Dados obtidos' :
+            (geointLabel[data.status] || 'Sem dados disponíveis');
+          output.replaceChildren();
+          const intro = document.createElement('p');
+          intro.textContent = latest + ' · ' + items.length + ' item(ns) · ' + layer.provider +
+            (data.cached ? ' · cache' : '');
+          output.append(intro);
+          if (data.error) {
+            const err = document.createElement('p');
+            err.textContent = data.error;
+            output.append(err);
+          }
+          const type = 'geoint-' + layer.id;
+          if (data.status === 'ok' || data.status === 'empty') {
+            // Não misturar as fontes oficiais com itens demonstrativos do mesmo tipo.
+            // Rejeitar coordenadas inválidas, mesmo que a API esteja mal configurada.
+            const points = items.filter(item =>
+              typeof item.lat === 'number' && Number.isFinite(item.lat) && Math.abs(item.lat) <= 90 &&
+              typeof item.lng === 'number' && Number.isFinite(item.lng) && Math.abs(item.lng) <= 180
+            ).map(item => ({
+                id: String(item.id), type,
+                lat: item.lat, lng: item.lng, altitude: 0.035,
+                label: String(item.title) + ' · ' + String(item.detail || layer.provider) +
+                  ' [' + String(item.data_kind || layer.data_kind) + ']',
+                color: geointColors[layer.id] || '#67e8f9'
+              }));
+            replaceAssets(type, points);
+            if (points.length) document.querySelector('[data-layer="all"]')?.click();
+          } else {
+            // Não deixar marcadores antigos parecerem uma consulta válida e atual.
+            replaceAssets(type, []);
+          }
+          if (items.length) {
+            const list = document.createElement('ol');
+            list.className = 'geoint-results';
+            items.slice(0, 8).forEach(item => {
+              const entry = document.createElement('li');
+              entry.textContent = String(item.title) + (item.detail ? ' · ' + String(item.detail) : '');
+              list.append(entry);
+            });
+            output.append(list);
+          }
+          geointStatus.textContent = 'Consulta: ' + layer.name + ' · ' + latest +
+            ' · ' + new Date().toLocaleTimeString('pt-BR');
+        } catch (error) {
+          replaceAssets('geoint-' + layer.id, []);
+          output.textContent = 'Não foi possível consultar esta fonte. Marcadores anteriores removidos; tente novamente.';
+          geointStatus.textContent = 'Consulta: ' + layer.name + ' · falhou · ' +
+            new Date().toLocaleTimeString('pt-BR');
+        } finally { button.disabled = false; }
+      }
+
+      async function loadGeointCatalog() {
+        geointStatus.textContent = 'Consultando o catálogo, sem carregar dados externos…';
+        try {
+          const res = await fetch('/api/geoint/layers', {headers: {Accept: 'application/json'}});
+          if (!res.ok) throw new Error('API indisponível');
+          const payload = await res.json();
+          if (!Array.isArray(payload.layers) || payload.layers.length !== 16) {
+            throw new Error('Catálogo incompleto');
+          }
+          geointCatalog = payload.layers;
+          geointList.replaceChildren();
+          for (const layer of geointCatalog) {
+            const row = document.createElement('section');
+            row.className = 'geoint-source';
+            const heading = document.createElement('div');
+            heading.className = 'geoint-source-heading';
+            const name = document.createElement('strong');
+            name.textContent = layer.name;
+            const label = document.createElement('small');
+            label.textContent = geointLabel[layer.status] || layer.status;
+            heading.append(name, label);
+            const desc = document.createElement('p');
+            desc.textContent = layer.provider + ' · ' + layer.description;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = layer.id === 'traffic' ? 'Abrir Google Maps' :
+              layer.id === 'imagery' ? 'Abrir NASA Worldview' : 'Consultar';
+            const output = document.createElement('div');
+            output.className = 'geoint-note';
+            button.addEventListener('click', () => queryGeointLayer(layer, row, button, output));
+            row.append(heading, desc, button, output);
+            geointList.append(row);
+          }
+          geointStatus.textContent = '16 categorias cadastradas · busca manual e status por fonte';
+        } catch {
+          geointStatus.textContent = 'Catálogo indisponível. Inicie a API FastAPI para carregar as fontes.';
+        }
+      }
+
+      // Meteorologia visual: cada consulta é uma ação humana explícita.
+      // Um ponto meteorológico representa um modelo para uma coordenada; não um mapa
+      // contínuo de calor ou chuva para toda a cidade.
+      const weatherPanel = document.getElementById('weather-panel');
+      const weatherToggle = document.getElementById('weather-toggle');
+      const weatherSource = document.getElementById('weather-source');
+      const weatherFetch = document.getElementById('weather-fetch');
+      const weatherStatus = document.getElementById('weather-status');
+      const weatherMetrics = document.getElementById('weather-metrics');
+      const weatherEvents = document.getElementById('weather-events');
+      const weatherSources = new Set(['weather', 'air_quality', 'extreme_events', 'wildfires']);
+      let weatherSequence = 0;
+      let weatherLastLayer = null;
+
+      function formatWeatherMeasurement(value, unit = '') {
+        return typeof value === 'number' && Number.isFinite(value)
+          ? value.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + unit
+          : 'Não informado';
+      }
+
+      function renderWeatherMeasurements(item) {
+        weatherMetrics.replaceChildren();
+        const measures = item && typeof item.measurements === 'object' && item.measurements
+          ? item.measurements : {};
+        const values = [
+          ['temperature_c', 'Temperatura', ' °C'],
+          ['humidity_pct', 'Umidade', '%'],
+          ['wind_speed_kmh', 'Vento', ' km/h'],
+          ['wind_direction_deg', 'Vento de', '°'],
+          ['precipitation_mm', 'Precipitação', ' mm'],
+          ['cloud_cover_pct', 'Nuvens', '%'],
+          ['pm25_ugm3', 'PM2.5', ' µg/m³'],
+          ['pm10_ugm3', 'PM10', ' µg/m³'],
+          ['us_aqi', 'AQI (EUA)', '']
+        ];
+        for (const [key, label, unit] of values) {
+          const value = measures[key];
+          if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+          const card = document.createElement('div');
+          card.className = 'weather-metric';
+          const title = document.createElement('span');
+          title.textContent = label;
+          const display = document.createElement('strong');
+          display.textContent = formatWeatherMeasurement(value, unit);
+          card.append(title, display);
+          if (key === 'wind_direction_deg') {
+            const arrow = document.createElement('span');
+            arrow.className = 'weather-wind-arrow';
+            arrow.textContent = '➤';
+            // O ângulo do provedor indica DE ONDE o vento vem (norte = 0°).
+            // Esta seta aponta para onde o vento sopra, usando o leste como 0° CSS.
+            arrow.style.transform = 'rotate(' + ((value + 90) % 360) + 'deg)';
+            arrow.title = 'Direção para onde o vento sopra (estimativa)';
+            card.append(arrow);
+          }
+          weatherMetrics.append(card);
+        }
+      }
+
+      function clearWeatherVisuals() {
+        weatherSequence += 1;
+        weatherFetch.disabled = false;
+        if (weatherLastLayer) replaceAssets('geoint-' + weatherLastLayer, []);
+        weatherLastLayer = null;
+        weatherMetrics.replaceChildren();
+        weatherEvents.replaceChildren();
+        weatherStatus.textContent = 'Dados removidos. Nenhuma fonte foi consultada novamente.';
+      }
+
+      async function queryWeatherVisualLayer() {
+        const source = weatherSource.value;
+        if (!weatherSources.has(source)) {
+          weatherStatus.textContent = 'Fonte não permitida.';
+          return;
+        }
+        const requestId = ++weatherSequence;
+        weatherFetch.disabled = true;
+        const previousLayer = weatherLastLayer;
+        if (previousLayer && previousLayer !== source) {
+          replaceAssets('geoint-' + previousLayer, []);
+        }
+        weatherLastLayer = source;
+        weatherMetrics.replaceChildren();
+        weatherEvents.replaceChildren();
+        weatherStatus.textContent = 'Consultando provedor oficial sob demanda…';
+        const camera = globe.pointOfView() || {lat: 0, lng: -30};
+        const params = new URLSearchParams({
+          lat: String(Number.isFinite(camera.lat) ? camera.lat : 0),
+          lng: String(Number.isFinite(camera.lng) ? camera.lng : -30)
+        });
+        try {
+          const response = await fetch('/api/geoint/layers/' + source + '?' + params, {
+            headers: {Accept: 'application/json'}
+          });
+          if (!response.ok) throw new Error('API não respondeu');
+          const data = await response.json();
+          if (requestId !== weatherSequence || source !== weatherSource.value) return;
+          const status = String(data.status || 'unavailable');
+          if (!['ok', 'empty'].includes(status)) {
+            replaceAssets('geoint-' + source, []);
+            weatherStatus.textContent = status === 'requires_configuration'
+              ? 'Fonte exige configuração no servidor. Nenhum dado fictício foi exibido.'
+              : 'Fonte indisponível. Marcadores anteriores foram removidos.';
+            return;
+          }
+          const items = Array.isArray(data.items) ? data.items.slice(0, 75) : [];
+          const points = items.filter(item => item &&
+            typeof item.lat === 'number' && Number.isFinite(item.lat) &&
+            Math.abs(item.lat) <= 90 &&
+            typeof item.lng === 'number' && Number.isFinite(item.lng) &&
+            Math.abs(item.lng) <= 180
+          ).map(item => ({
+            id: String(item.id), type: 'geoint-' + source,
+            lat: item.lat, lng: item.lng, altitude: 0.04,
+            label: String(item.title) + ' · ' + String(item.detail || data.provider || source) +
+              ' [' + String(item.data_kind || data.data_kind || 'fonte') + ']',
+            color: geointColors[source] || '#7dd3fc'
+          }));
+          replaceAssets('geoint-' + source, points);
+          if (points.length) document.querySelector('[data-layer="all"]')?.click();
+          renderWeatherMeasurements(items[0]);
+          if (source === 'extreme_events' || source === 'wildfires') {
+            for (const item of items.slice(0, 8)) {
+              const row = document.createElement('li');
+              row.textContent = String(item.title) + (item.timestamp ? ' · ' + item.timestamp : '');
+              weatherEvents.append(row);
+            }
+          }
+          const kind = (source === 'weather' || source === 'air_quality') ? 'modelo'
+            : source === 'wildfires' ? 'detecção orbital' : 'eventos catalogados globais';
+          const sampledAt = items[0]?.timestamp ? ' · dado: ' + items[0].timestamp + ' UTC' : '';
+          weatherStatus.textContent = (status === 'empty' ? 'Nenhum item retornado' : points.length + ' ponto(s) geográfico(s)') +
+            ' · ' + kind + ' · ' + String(data.provider || source) +
+            (data.cached ? ' · cache' : '') + sampledAt;
+        } catch {
+          if (requestId !== weatherSequence) return;
+          replaceAssets('geoint-' + source, []);
+          weatherStatus.textContent = 'Consulta falhou. Nenhuma informação anterior é exibida como atual.';
+        } finally {
+          if (requestId === weatherSequence) weatherFetch.disabled = false;
+        }
+      }
+
+      weatherToggle.addEventListener('click', () => {
+        weatherPanel.hidden = !weatherPanel.hidden;
+        weatherToggle.setAttribute('aria-expanded', String(!weatherPanel.hidden));
+      });
+      document.getElementById('weather-close').addEventListener('click', () => {
+        weatherPanel.hidden = true;
+        weatherToggle.setAttribute('aria-expanded', 'false');
+      });
+      document.getElementById('weather-clear').addEventListener('click', clearWeatherVisuals);
+      weatherSource.addEventListener('change', clearWeatherVisuals);
+      weatherFetch.addEventListener('click', queryWeatherVisualLayer);
+      }
+
+      function setGlobeControlsEnabled(enabled) {
+        document.querySelectorAll('[data-layer], .tool-actions button, #asset-search')
+          .forEach(element => { element.disabled = !enabled; });
+      }
+
+      function showGlobeFallback() {
+        document.getElementById('globe-fallback').hidden = false;
+        document.getElementById('overview-globe').textContent = 'INDISPONÍVEL';
+        document.getElementById('api-status').textContent = 'GLOBO 3D INDISPONÍVEL';
+        setGlobeControlsEnabled(false);
+      }
+
+      function bootSentinel() {
+        let started = false;
+        let timeout;
+        function startWhenReady() {
+          if (started || typeof Globe !== 'function') return;
+          started = true;
+          clearTimeout(timeout);
+          try {
+            initializeSentinel();
+            const fallback = document.getElementById('globe-fallback');
+            if (fallback) fallback.hidden = true;
+            document.getElementById('overview-globe').textContent = 'ATIVO';
+            setGlobeControlsEnabled(true);
+          } catch (error) {
+            console.error('Falha ao iniciar o globo 3D:', error);
+            showGlobeFallback();
+          }
+        }
+        const loader = document.querySelector('script[src*="globe.gl"]');
+        if (loader) loader.addEventListener('load', startWhenReady, { once: true });
+        startWhenReady();
+        if (!started) timeout = setTimeout(() => { if (!started) showGlobeFallback(); }, 8000);
+      }
+      bootSentinel();
     </script>
   </body>
 </html>

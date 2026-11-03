@@ -55,6 +55,9 @@ jobs:
           PY
           node --check /tmp/sentinel-inline.js
 
+      - name: Testar controles do painel web
+        run: node --test tests/sentinel-hud.test.cjs
+
       - name: Validate safe local-only Docker Compose contract
         env:
           SENTINEL_API_TOKEN: ci-test-token-not-real-012345678901234567890

@@ -66,6 +66,7 @@ jobs:
           node --test \
             data/aircraftMeta.test.mjs \
             data/trafficQueue.test.mjs \
+            data/trafficFlowStyle.test.mjs \
             data/tapAddress.test.mjs
 
       - name: Validate safe local-only Docker Compose contract

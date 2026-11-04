@@ -192,7 +192,7 @@ test('controle de rotação respeita movimento reduzido, aba oculta e modo mapa'
     globe: { controls: () => rotation }
   };
   vm.runInNewContext(
-    snippet("const rotationToggle = document.getElementById('rotation-toggle');", '// Atualiza bússola'),
+    snippet("const rotationToggle = document.getElementById('rotation-toggle');", 'function frameEarth('),
     context
   );
   assert.equal(rotation.autoRotate, false, 'movimento reduzido desliga o giro inicialmente');
@@ -220,16 +220,19 @@ test('recentralizar retorna ao globo e fecha o inspetor', () => {
   const button = { addEventListener(name, handler) { this[name] = handler; } };
   const context = {
     document: { getElementById: id => id === 'reset-camera' ? button : inspector },
+    window: { innerWidth: 1440, innerHeight: 900 },
+    motionPreference: { matches: false },
     globe: { pointOfView(position, duration) { camera = { position, duration }; } },
     setMapView(value) { mapEnabled = value; }
   };
   vm.runInNewContext(
-    snippet('function resetGlobalView()', '// Coordenadas estáticas de atalhos'), context
+    snippet('function frameEarth(', '// Coordenadas estáticas de atalhos'), context
   );
+  assert.equal(camera.duration, 0);
   button.click();
   assert.equal(mapEnabled, false);
   assert.equal(inspector.hidden, true);
-  assert.equal(camera.position.altitude, 2.5);
+  assert.equal(camera.position.altitude, 1.95);
   assert.equal(camera.duration, 900);
 });
 

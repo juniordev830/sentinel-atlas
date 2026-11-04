@@ -1,0 +1,47 @@
+name: Prévia do globo no Chrome
+on:
+  pull_request:
+    paths: ['web/**', '.github/workflows/globe-preview.yml']
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m pip install selenium==4.38.0
+      - name: Abrir o globo e verificar as duas renderizações
+        run: |
+          python -m http.server 8181 --directory web >/tmp/http.log 2>&1 &
+          mkdir -p capturas
+          python - <<'PY'
+          from selenium import webdriver
+          from selenium.webdriver.common.by import By
+          from selenium.webdriver.support.ui import WebDriverWait
+          for mode in ['3d', '2d']:
+              options = webdriver.ChromeOptions()
+              for flag in ['--headless=new', '--window-size=1440,960', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']:
+                  options.add_argument(flag)
+              if mode == '2d':
+                  options.add_argument('--disable-webgl')
+              with webdriver.Chrome(options=options) as browser:
+                  browser.set_page_load_timeout(60)
+                  browser.get('http://localhost:8181')
+                  wait = WebDriverWait(browser, 35)
+                  try:
+                      if mode == '3d':
+                          wait.until(lambda b: b.find_element(By.ID, 'overview-globe').get_attribute('textContent') == 'ATIVO')
+                          browser.find_element(By.ID, 'reset-camera').click()
+                          wait.until(lambda b: b.execute_script("return performance.getEntriesByType('resource').some(e => e.name.endsWith('earth-day.webp') && e.responseEnd > 0)"))
+                      else:
+                          wait.until(lambda b: b.find_element(By.ID, 'globe-fallback').is_displayed())
+                          assert browser.find_element(By.CSS_SELECTOR, '.fallback-orb').size['width'] > 420
+                  finally:
+                      browser.save_screenshot(f'capturas/sentinel-{mode}.png')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sentinel-chrome
+          path: capturas/

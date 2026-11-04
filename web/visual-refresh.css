@@ -105,20 +105,17 @@ button.active { background: linear-gradient(135deg, #91e9e5, #63bde0); }
 .fallback-eyebrow span { color: #83eebd; }
 .fallback-orb {
   position: relative;
-  width: clamp(300px, min(39vw, 45vh), 520px);
+  width: min(53vw, 56vh, 700px);
   aspect-ratio: 1;
-  background:
-    radial-gradient(circle at 29% 23%, rgba(202, 244, 255, .13), transparent 43%),
-    linear-gradient(105deg, transparent 43%, rgba(1, 9, 22, .55) 72%, rgba(1, 6, 16, .88) 97%),
-    url('https://unpkg.com/three-globe@2.43.0/example/img/earth-blue-marble.jpg') 38% center / auto 100%,
-    #124b68;
+  /* Orthographic Atlantic view from the same day texture as the interactive globe. */
+  background: #124b68 url('assets/earth-atlantic.webp') center / cover;
   border: 1px solid rgba(140, 225, 249, .26);
   box-shadow:
     0 0 0 1px rgba(90, 217, 238, .15),
     0 0 0 22px rgba(89, 206, 230, .028),
     0 0 0 74px rgba(89, 206, 230, .018),
     0 0 85px 20px rgba(35, 159, 198, .32),
-    inset -35px -32px 70px rgba(0, 6, 20, .58);
+    inset 0 0 8px rgba(122, 207, 244, .28);
 }
 .fallback-orb::before {
   content: '';
@@ -152,7 +149,7 @@ button.active { background: linear-gradient(135deg, #91e9e5, #63bde0); }
 /* Keep the information hierarchy usable on narrow screens. */
 @media (max-width: 900px) {
   .overview-panel { top: 140px; left: 10px; width: min(235px, 34vw); }
-  .fallback-orb { width: min(47vw, 44vh); }
+  .fallback-orb { width: min(51vw, 52vh); }
   #globe-fallback { padding-bottom: 170px; }
 }
 @media (max-width: 768px) {
@@ -161,14 +158,14 @@ button.active { background: linear-gradient(135deg, #91e9e5, #63bde0); }
   .topbar .tools { gap: 7px; }
   .overview-panel { display: none; }
   #globe-fallback { padding-top: 110px; padding-bottom: 198px; }
-  .fallback-orb { width: min(66vw, 39vh); min-width: 210px; }
+  .fallback-orb { width: min(84vw, 46vh); }
   .fallback-message { margin-top: 22px; max-width: min(75vw, 360px); font-size: 11px; }
   .fallback-message strong { font-size: 14px; }
   .fallback-eyebrow { font-size: 8px; letter-spacing: .1em; }
   .control-deck { padding: 11px; }
 }
 @media (max-height: 650px) {
-  .fallback-orb { width: min(32vw, 40vh); }
+  .fallback-orb { width: min(52vw, 46vh); }
   #globe-fallback { padding-bottom: 80px; }
 }
 @media (prefers-reduced-motion: reduce) {

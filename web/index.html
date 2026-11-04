@@ -1327,7 +1327,7 @@
       let googlePlacesSearchSequence = 0;
       const textures = {
         night: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-night.jpg',
-        day: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-blue-marble.jpg',
+        day: 'assets/earth-day.webp',
       };
       let currentTexture = 'day';
       let replayTimer;
@@ -1504,7 +1504,7 @@
         try {
           const sun = new THREE.DirectionalLight(0xfff0d8, 2.0);
           solarLight = sun;
-          const skyBounce = new THREE.AmbientLight(0x87aec6, 0.27);
+          const skyBounce = new THREE.AmbientLight(0xb8d0e4, 0.65);
           globe.lights?.([skyBounce, sun]);
           function refreshSolarLight() {
             const point = estimateSubsolarPoint(new Date());
@@ -1721,9 +1721,16 @@
       });
       updateRotation();
 
+      function frameEarth(duration = 0) {
+        const aspect = window.innerWidth / window.innerHeight;
+        const altitude = Math.max(1.95, 1.95 / aspect);
+        globe.pointOfView({ lat: -9, lng: -38, altitude }, duration);
+      }
+      frameEarth();
+
       function resetGlobalView() {
         setMapView(false);
-        globe.pointOfView({ lat: 0, lng: -30, altitude: 2.5 }, 900);
+        frameEarth(motionPreference.matches ? 0 : 900);
         document.getElementById('inspector').hidden = true;
       }
       document.getElementById('reset-camera').addEventListener('click', resetGlobalView);

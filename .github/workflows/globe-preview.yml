@@ -32,7 +32,10 @@ jobs:
                   try:
                       if mode == '3d':
                           wait.until(lambda b: b.find_element(By.ID, 'overview-globe').get_attribute('textContent') == 'ATIVO')
+                          drawer = browser.find_element(By.CSS_SELECTOR, '.control-deck summary')
+                          drawer.click()
                           browser.find_element(By.ID, 'reset-camera').click()
+                          drawer.click()
                           wait.until(lambda b: b.execute_script("return performance.getEntriesByType('resource').some(e => e.name.endsWith('earth-day.webp') && e.responseEnd > 0)"))
                       else:
                           wait.until(lambda b: b.find_element(By.ID, 'globe-fallback').is_displayed())

@@ -1154,7 +1154,8 @@
       </div>
 
       <div class="bottombar">
-        <div class="panel control-deck">
+        <details class="panel control-deck">
+          <summary>Camadas e ferramentas</summary>
           <div class="control-row">
             <span class="control-label">Camadas</span>
             <div class="filters" role="group" aria-label="Filtros de camadas">
@@ -1201,7 +1202,7 @@
           <button id="toggle-ai" style="border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,0.15);">🤖 Copiloto IA</button>
             </div>
           </div>
-        </div>
+        </details>
         <div class="panel legend">
           <span>Aviões</span>
           <span class="ship">Navios</span>
@@ -1504,7 +1505,7 @@
         try {
           const sun = new THREE.DirectionalLight(0xfff0d8, 2.0);
           solarLight = sun;
-          const skyBounce = new THREE.AmbientLight(0xb8d0e4, 0.65);
+          const skyBounce = new THREE.AmbientLight(0xe4edff, 1.45);
           globe.lights?.([skyBounce, sun]);
           function refreshSolarLight() {
             const point = estimateSubsolarPoint(new Date());
@@ -1523,7 +1524,7 @@
             if (!document.hidden) refreshSolarLight();
           });
           if (globeMaterial) {
-            globeMaterial.specular = new THREE.Color('#9eb5c5');
+            globeMaterial.specular = new THREE.Color('#060a0d');
             globeMaterial.shininess = 35;
             // Refletividade dos oceanos, sem forçar brilho nas massas de terra.
             new THREE.TextureLoader().load(
@@ -1539,7 +1540,7 @@
           const webglRenderer = globe.renderer?.();
           if (webglRenderer && THREE.ACESFilmicToneMapping !== undefined) {
             webglRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-            webglRenderer.toneMappingExposure = 1.05;
+            webglRenderer.toneMappingExposure = 1.12;
           }
         } catch (error) {
           console.info('Iluminação solar avançada indisponível; mantendo padrão.', error);

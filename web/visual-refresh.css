@@ -171,3 +171,15 @@ button.active { background: linear-gradient(135deg, #91e9e5, #63bde0); }
 @media (prefers-reduced-motion: reduce) {
   .fallback-orb, .fallback-orb::before, .fallback-orb::after { animation: none; }
 }
+
+.control-deck:not([open]) { flex: 0 1 auto; }
+.control-deck summary {
+  cursor: pointer;
+  color: #dcf6fa;
+  font: 600 13px/1.5 system-ui, sans-serif;
+  padding: 4px 10px;
+}
+.control-deck[open] summary { margin-bottom: 8px; }
+@media (min-width: 901px) {
+  #globe-fallback { padding: 95px 24px 70px; }
+}

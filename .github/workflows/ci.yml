@@ -58,6 +58,16 @@ jobs:
       - name: Testar controles do painel web
         run: node --test tests/sentinel-hud.test.cjs
 
+      # Incremental, dependency-free coverage for the legacy data/ helpers.
+      # Do not run data/*.test.mjs wholesale yet: some suites import external
+      # packages (Cesium/satellite.js) and paths not present in this repo.
+      - name: Test Node data helper contracts
+        run: |
+          node --test \
+            data/aircraftMeta.test.mjs \
+            data/trafficQueue.test.mjs \
+            data/tapAddress.test.mjs
+
       - name: Validate safe local-only Docker Compose contract
         env:
           SENTINEL_API_TOKEN: ci-test-token-not-real-012345678901234567890

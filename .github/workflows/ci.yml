@@ -67,7 +67,12 @@ jobs:
             data/aircraftMeta.test.mjs \
             data/trafficQueue.test.mjs \
             data/trafficFlowStyle.test.mjs \
-            data/tapAddress.test.mjs
+            data/tapAddress.test.mjs \
+            data/aircraftNearbyPolicy.test.mjs \
+            data/adsbLolFallback.test.mjs \
+            data/route-cap-truthfulness.test.mjs \
+            data/firms-calendar-validity.test.mjs \
+            data/cockpitAirLod.test.mjs
 
       - name: Validate safe local-only Docker Compose contract
         env:

@@ -76,6 +76,56 @@ jobs:
             data/modelEligibility.test.mjs \
             data/detectionCohort.test.mjs
 
+      # Inventory is informational: it does not claim unselected suites pass.
+      # Fail only if an explicitly selected test was removed or renamed.
+      - name: Inventory remaining Node data suites
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          ci = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
+          selected = set(re.findall(r"data/[\\w.-]+\\.test\\.mjs", ci))
+          available = {p.as_posix() for p in Path("data").glob("*.test.mjs")}
+          missing = sorted(selected - available)
+          if missing:
+              raise SystemExit("CI references missing test suites: " + ", ".join(missing))
+
+          lines = [
+              "### Node data test inventory",
+              f"Selected in CI: **{len(selected)}**; discovered: **{len(available)}**; not selected: **{len(available - selected)}**.",
+              "",
+              "Static import triage only; candidates still need real execution before being enabled.",
+              "",
+              "| Not selected | Initial triage |",
+              "| --- | --- |",
+          ]
+          for name in sorted(available - selected):
+              source = Path(name).read_text(encoding="utf-8")
+              imports = re.findall(r"""(?:\\bfrom\\s+|\\bimport\\s+)["']([^"']+)["']""", source)
+              missing_local = sorted({
+                  spec for spec in imports
+                  if spec.startswith(".") and not (Path(name).parent / spec).exists()
+              })
+              external = sorted({
+                  spec for spec in imports
+                  if not spec.startswith(".") and not spec.startswith("node:")
+              })
+              if missing_local:
+                  status = "Missing relative imports: " + ", ".join(missing_local)
+              elif external:
+                  status = "External imports: " + ", ".join(external)
+              else:
+                  status = "Candidate for execution (static imports only)"
+              lines.append(f"| \`{name}\` | {status} |")
+          report = "\\n".join(lines) + "\\n"
+          print(report)
+          if os.environ.get("GITHUB_STEP_SUMMARY"):
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
+                  output.write(report)
+          PY
+
       - name: Validate safe local-only Docker Compose contract
         env:
           SENTINEL_API_TOKEN: ci-test-token-not-real-012345678901234567890

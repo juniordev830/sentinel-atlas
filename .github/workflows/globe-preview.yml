@@ -10,16 +10,22 @@ jobs:
     timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: baseline
+          sparse-checkout: web
       - run: python -m pip install selenium==4.38.0
       - name: Abrir o globo e verificar as duas renderizações
         run: |
           python -m http.server 8181 --directory web >/tmp/http.log 2>&1 &
+          python -m http.server 8182 --directory baseline/web >/tmp/http-before.log 2>&1 &
           mkdir -p capturas
           python - <<'PY'
           from selenium import webdriver
           from selenium.webdriver.common.by import By
           from selenium.webdriver.support.ui import WebDriverWait
-          for mode in ['3d', '2d']:
+          for width, mode, before in [(1440, '3d', False), (1440, '2d', False), (390, '2d', True), (390, '2d', False), (390, '3d', False)]:
               options = webdriver.ChromeOptions()
               for flag in ['--headless=new', '--window-size=1440,960', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']:
                   options.add_argument(flag)
@@ -27,7 +33,12 @@ jobs:
                   options.add_argument('--disable-webgl')
               with webdriver.Chrome(options=options) as browser:
                   browser.set_page_load_timeout(60)
-                  browser.get('http://localhost:8181')
+                  browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+                      'width': width, 'height': 844 if width == 390 else 900,
+                      'deviceScaleFactor': 1, 'mobile': width == 390,
+                  })
+                  port = 8182 if before else 8181
+                  browser.get(f'http://localhost:{port}')
                   wait = WebDriverWait(browser, 35)
                   try:
                       if mode == '3d':
@@ -39,9 +50,15 @@ jobs:
                           wait.until(lambda b: b.execute_script("return performance.getEntriesByType('resource').some(e => e.name.endsWith('earth-day.webp') && e.responseEnd > 0)"))
                       else:
                           wait.until(lambda b: b.find_element(By.ID, 'globe-fallback').is_displayed())
-                          assert browser.find_element(By.CSS_SELECTOR, '.fallback-orb').size['width'] > 420
+                          orb = browser.find_element(By.CSS_SELECTOR, '.fallback-orb')
+                          diameter = orb.size['width']
+                          print(f'{width}px — {"base" if before else "PR"} — globo 2D: {diameter}px')
+                          if not before:
+                              assert diameter > (420 if width == 1440 else 275)
+                              assert 0 <= orb.rect['x'] and orb.rect['x'] + diameter <= width + 1
                   finally:
-                      browser.save_screenshot(f'capturas/sentinel-{mode}.png')
+                      label = 'base' if before else 'pr'
+                      browser.save_screenshot(f'capturas/{label}-{width}-{mode}.png')
           PY
       - uses: actions/upload-artifact@v4
         if: always()

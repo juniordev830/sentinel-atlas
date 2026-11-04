@@ -86,7 +86,7 @@ jobs:
           from pathlib import Path
 
           ci = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
-          selected = set(re.findall(r"data/[\\w.-]+\\.test\\.mjs", ci))
+          selected = set(re.findall(r"data/[\w.-]+\.test\.mjs", ci))
           available = {p.as_posix() for p in Path("data").glob("*.test.mjs")}
           missing = sorted(selected - available)
           if missing:
@@ -103,7 +103,7 @@ jobs:
           ]
           for name in sorted(available - selected):
               source = Path(name).read_text(encoding="utf-8")
-              imports = re.findall(r"""(?:\\bfrom\\s+|\\bimport\\s+)["']([^"']+)["']""", source)
+              imports = re.findall(r"""(?:\bfrom\s+|\bimport\s+)["']([^"']+)["']""", source)
               missing_local = sorted({
                   spec for spec in imports
                   if spec.startswith(".") and not (Path(name).parent / spec).exists()
@@ -118,8 +118,8 @@ jobs:
                   status = "External imports: " + ", ".join(external)
               else:
                   status = "Candidate for execution (static imports only)"
-              lines.append(f"| \`{name}\` | {status} |")
-          report = "\\n".join(lines) + "\\n"
+              lines.append(f"| {name} | {status} |")
+          report = "\n".join(lines) + "\n"
           print(report)
           if os.environ.get("GITHUB_STEP_SUMMARY"):
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:

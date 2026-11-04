@@ -72,7 +72,9 @@ jobs:
             data/adsbLolFallback.test.mjs \
             data/route-cap-truthfulness.test.mjs \
             data/firms-calendar-validity.test.mjs \
-            data/cockpitAirLod.test.mjs
+            data/cockpitAirLod.test.mjs \
+            data/modelEligibility.test.mjs \
+            data/detectionCohort.test.mjs
 
       - name: Validate safe local-only Docker Compose contract
         env:

@@ -76,7 +76,8 @@ jobs:
             data/modelEligibility.test.mjs \
             data/detectionCohort.test.mjs \
             data/aircraftRecession.test.mjs \
-            data/aisStreamAdapter.test.mjs
+            data/aisStreamAdapter.test.mjs \
+            data/firmsAdapt.test.mjs
 
       # Inventory is informational: it does not claim unselected suites pass.
       # Fail only if an explicitly selected test was removed or renamed.

@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -56,7 +57,7 @@ jobs:
           node --check /tmp/sentinel-inline.js
 
       - name: Testar controles do painel web
-        run: node --test tests/sentinel-hud.test.cjs
+        run: node --test tests/*.test.cjs
 
       - name: Validate safe local-only Docker Compose contract
         env:

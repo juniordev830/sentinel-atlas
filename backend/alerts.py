@@ -15,6 +15,8 @@ def send_webhook(url: str | None, event: dict[str, object]) -> bool:
         parsed = urlsplit(url)
         if parsed.scheme not in ("https", "http") or not parsed.hostname:
             return False
+        # Accessing .port validates malformed or out-of-range port numbers.
+        _ = parsed.port
     except ValueError:
         return False
     body = json.dumps({"source": "sentinel-atlas", "event": event}).encode("utf-8")

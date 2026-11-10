@@ -3,11 +3,21 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 
 def send_webhook(url: str | None, event: dict[str, object]) -> bool:
-    if not url:
+    if not url or not isinstance(url, str):
+        return False
+    # Reject malformed/non-HTTP URLs without raising from urllib.urlopen.
+    try:
+        parsed = urlsplit(url)
+        if parsed.scheme not in ("https", "http") or not parsed.hostname:
+            return False
+        # Accessing .port validates malformed or out-of-range port numbers.
+        _ = parsed.port
+    except ValueError:
         return False
     body = json.dumps({"source": "sentinel-atlas", "event": event}).encode("utf-8")
     request = Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")

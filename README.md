@@ -381,3 +381,7 @@ A API exige `SENTINEL_API_TOKEN` com pelo menos 32 caracteres quando `SENTINEL_E
 - O token não é salvo em `localStorage`, não é inserido no JavaScript do painel e não é enviado na URL. O cookie é enviado automaticamente pelo navegador nas chamadas HTTP e WebSocket da mesma origem.
 - Requisições mutáveis autenticadas por cookie e a conexão WebSocket validam a origem. Mantenha HTTPS em produção.
 - O token administrativo continua sendo uma credencial compartilhada: esta sessão de navegador não implementa contas individuais, papéis ou isolamento de dados por usuário. Não exponha o serviço multiusuário antes de implementar autorização por tenant/objeto e limitação de tentativas no proxy de borda.
+
+## Validação e manutenção
+
+Para revisar alterações neste projeto, consulte o [guia técnico de validação](docs/GUIA_DE_VALIDACAO.md), com comandos, cenários de regressão e próximos incrementos.

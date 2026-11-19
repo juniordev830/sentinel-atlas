@@ -1170,6 +1170,7 @@
             <div class="tool-actions" role="group" aria-label="Ferramentas do mapa">
           <button id="my-location">📍 Minha localização</button>
           <button id="replay-history">⏱️ Histórico</button>
+          <button id="demo-geofence" type="button">Simular geofence</button>
           <button id="texture-toggle">🌙 Luz noturna</button>
           <label class="render-quality-control" for="render-quality">Detalhes
             <select id="render-quality" title="Qualidade de renderização do globo">
@@ -1272,6 +1273,8 @@
       ];
 
       // Geofences simuladas + dinâmicas do backend
+      let demoFence = null;
+      let demoVehicle = null;
       let loadedGeofences = [
         { name: 'Base Principal - SP', latitude: -23.5505, longitude: -46.6333, radius_meters: 1500 },
         { name: 'Porto de Santos', latitude: -23.9608, longitude: -46.3339, radius_meters: 3000 }
@@ -1301,12 +1304,13 @@
           { lat: -23.59, lng: -46.7, color: '#facc15', maxRadius: 2.5, propagationSpeed: 1.5, repeatPeriod: 1600 }
         ];
         // Adiciona geofences 3D como anéis pulsantes
-        loadedGeofences.forEach(fence => {
+        const visibleFences = demoFence ? [...loadedGeofences, demoFence] : loadedGeofences;
+        visibleFences.forEach(fence => {
           rings.push({
             lat: fence.latitude,
             lng: fence.longitude,
-            color: '#4ade80',
-            maxRadius: Math.max(1, fence.radius_meters / 500),
+            color: fence === demoFence ? '#fbbf24' : '#4ade80',
+            maxRadius: fence === demoFence ? 0.45 : Math.max(1, fence.radius_meters / 500),
             propagationSpeed: 1.2,
             repeatPeriod: 1800,
             isGeofence: true,
@@ -1367,7 +1371,7 @@
       function getFilteredPoints(layer) {
         let points = [...assets];
         if (layer === 'geofence') {
-          return loadedGeofences.map(f => ({
+          return [...(demoVehicle ? [demoVehicle] : []), ...loadedGeofences.map(f => ({
             id: `gf-${f.name}`,
             type: 'geofence',
             lat: f.latitude,
@@ -1375,7 +1379,7 @@
             color: '#4ade80',
             altitude: 0.02,
             label: `Geofence: ${f.name} · ${f.radius_meters}m`
-          }));
+          }))];
         }
         if (layer === 'all') {
           const gfPoints = loadedGeofences.map(f => ({
@@ -1387,7 +1391,7 @@
             altitude: 0.02,
             label: `Geofence: ${f.name} · ${f.radius_meters}m`
           }));
-          return [...points, ...gfPoints];
+          return [...points, ...gfPoints, ...(demoVehicle ? [demoVehicle] : [])];
         }
         return points.filter(a => a.type === layer);
       }
@@ -1859,6 +1863,57 @@
         }
       }
       document.getElementById('replay-history').addEventListener('click', replayHistory);
+
+      const demoButton = document.getElementById('demo-geofence');
+      const demoStatus = document.createElement('span');
+      demoStatus.setAttribute('role', 'status');
+      demoStatus.className = 'control-label';
+      demoButton.after(demoStatus);
+      function refreshDemoMarkers() {
+        const layer = document.querySelector('[data-layer].active')?.dataset.layer || 'all';
+        globe.ringsData(buildRingsData());
+        if (assetSearchInput.value.trim()) applyAssetSearch();
+        else globe.pointsData(getFilteredPoints(layer));
+      }
+      demoButton.addEventListener('click', () => {
+        const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+        const socket = new WebSocket(`${protocol}://${location.host}/ws/demo/geofence`);
+        const timeout = setTimeout(() => socket.close(), 8000);
+        const events = [];
+        demoButton.disabled = true;
+        demoStatus.textContent = 'Carregando simulação…';
+        demoFence = null;
+        demoVehicle = null;
+        assetSearchInput.value = '';
+        applyAssetSearch();
+        document.querySelector('[data-layer="all"]').click();
+        refreshDemoMarkers();
+        socket.addEventListener('message', ({ data }) => {
+          const { position, fence, event, distance_meters: distance } = JSON.parse(data);
+          if (!demoFence) {
+            demoFence = fence;
+            globe.pointOfView({ lat: fence.latitude, lng: fence.longitude, altitude: 0.35 }, 700);
+          }
+          if (event === 'entered') events.push('Entrada');
+          if (event === 'exited') events.push('Saída');
+          demoVehicle = {
+            id: 'geofence-demo-vehicle', type: 'demo-geofence', label: 'Veículo simulado',
+            lat: position.latitude, lng: position.longitude, altitude: 0.025, color: '#fbbf24',
+          };
+          refreshDemoMarkers();
+          demoStatus.textContent = `Simulação · ${events.join(' → ') || 'Veículo fora da área'} · ${distance} m`;
+        });
+        socket.addEventListener('close', () => {
+          clearTimeout(timeout);
+          demoButton.disabled = false;
+          if (events.length !== 2) {
+            demoStatus.textContent = 'Simulação indisponível. Confira a conexão com a API.';
+            demoFence = null;
+            demoVehicle = null;
+            refreshDemoMarkers();
+          }
+        });
+      });
 
       function sendDevicePosition(payload) {
         if (!positionSocket || positionSocket.readyState !== WebSocket.OPEN) {

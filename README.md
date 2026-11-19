@@ -19,6 +19,8 @@ O **Sentinel Atlas** reúne um núcleo de geolocalização em Python, uma API as
 
 ## Como usar o painel visual
 
+Clique em **Simular geofence** para acompanhar um veículo de demonstração perto de Natal. O painel mostra o percurso no globo e as transições de entrada e saída calculadas pelo backend via WebSocket. A simulação usa uma área independente e não grava posições nem dispara alertas.
+
 No painel do **God's Eye View**, a área **Camadas** filtra os tipos de objetos e a área **Ferramentas** oferece controles do globo.
 
 - **◫ Tela limpa / ▦ Mostrar painel:** ativa uma apresentação imersiva que esconde os painéis auxiliares sem bloquear o globo; o botão no topo ou a tecla `Esc` restauram os controles.

@@ -9,6 +9,30 @@ from backend.app import PositionInput, app
 
 client = TestClient(app)
 
+def test_demo_geofence_stream_is_isolated_and_repeatable(monkeypatch):
+    monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token=None))
+    def unexpected_write(*args, **kwargs):
+        pytest.fail("A simulação deve ficar fora do histórico e dos alertas.")
+    monkeypatch.setattr(app_module.store, "save_position", unexpected_write)
+    monkeypatch.setattr(app_module, "send_webhook", unexpected_write)
+    before = client.get("/api/geofences").json()
+    with client.websocket_connect("/ws/demo/geofence") as socket:
+        frames = [socket.receive_json() for _ in range(4)]
+        with pytest.raises(WebSocketDisconnect) as closing:
+            socket.receive_json()
+        assert closing.value.code == 1000
+    assert [frame["event"] for frame in frames] == [None, "entered", None, "exited"]
+    assert all(frame["fence"]["name"] == "Área demonstrativa" for frame in frames)
+    assert client.get("/api/geofences").json() == before
+
+
+def test_demo_geofence_uses_the_same_token_policy(monkeypatch):
+    monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="production", api_token="demo-secret"))
+    with pytest.raises(WebSocketDisconnect) as closing:
+        with client.websocket_connect("/ws/demo/geofence"):
+            pytest.fail("A conexão sem token não deveria ser aceita.")
+    assert closing.value.code == 1008
+
 
 
 def test_google_maps_public_config_never_exposes_admin_token(monkeypatch):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import hmac
 import os
@@ -511,11 +512,10 @@ def ai_query(payload: AIQueryInput) -> dict[str, Any]:
     return ai_analyzer.query_copilot(payload.question, ctx)
 
 
-@app.websocket("/ws/positions")
-async def positions(websocket: WebSocket) -> None:
+async def accept_position_socket(websocket: WebSocket) -> bool:
     if settings.environment == "production" and not settings.api_token:
         await websocket.close(code=1013, reason="Autenticação da API não configurada")
-        return
+        return False
 
     authorization = websocket.headers.get("authorization", "")
     bearer_valid = bool(settings.api_token) and hmac.compare_digest(
@@ -524,15 +524,42 @@ async def positions(websocket: WebSocket) -> None:
     session_valid = _valid_session_cookie(websocket.cookies.get(SESSION_COOKIE_NAME))
     if settings.api_token and not (bearer_valid or session_valid):
         await websocket.close(code=1008, reason="Autenticação necessária")
-        return
+        return False
     if session_valid and not bearer_valid:
         host = websocket.headers.get("host")
         origin = websocket.headers.get("origin")
         if not _is_same_origin(origin, host, websocket.url.scheme):
             await websocket.close(code=1008, reason="Origem da conexão inválida")
-            return
+            return False
 
     await websocket.accept()
+    return True
+
+
+@app.websocket("/ws/demo/geofence")
+async def demo_geofence(websocket: WebSocket) -> None:
+    if not await accept_position_socket(websocket):
+        return
+    fence = Geofence("Área demonstrativa", -5.79, -35.20, 45_000)
+    engine = AutomationEngine(fence)
+    try:
+        for index, longitude in enumerate((-36.00, -35.42, -35.20, -34.40)):
+            if index:
+                await asyncio.sleep(0.85)
+            position = Position(fence.latitude, longitude, time.time())
+            await websocket.send_json({
+                "position": asdict(position), "fence": asdict(fence),
+                "event": engine.process(position), "distance_meters": round(distance_meters(position, fence)),
+            })
+        await websocket.close()
+    except (WebSocketDisconnect, OSError):
+        return
+
+
+@app.websocket("/ws/positions")
+async def positions(websocket: WebSocket) -> None:
+    if not await accept_position_socket(websocket):
+        return
     try:
         while True:
             message = await websocket.receive_text()

@@ -375,7 +375,10 @@ def bicycle(start_lat: float, start_lon: float, end_lat: float, end_lon: float) 
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except SourceUnavailable as error:
-        return {"code": "Unavailable", "routes": [], "error": str(error)}
+        return JSONResponse(
+            status_code=503,
+            content={"code": "Unavailable", "routes": [], "error": str(error)},
+        )
 
 
 @app.post("/api/geofences", status_code=201)

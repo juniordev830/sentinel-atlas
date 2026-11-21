@@ -349,3 +349,21 @@ def test_session_signature_rejects_unicode_without_server_error(monkeypatch):
 def test_bicycle_route_rejects_invalid_coordinates(coordinates):
     response = client.get("/api/routes/bicycle", params=coordinates)
     assert response.status_code == 422
+
+
+def test_bicycle_route_reports_upstream_outage_with_http_503(monkeypatch):
+    from backend.source_clients import SourceUnavailable
+
+    def unavailable(*_coordinates):
+        raise SourceUnavailable("Serviço OSRM indisponível")
+
+    monkeypatch.setattr(app_module, "bicycle_route", unavailable)
+    response = client.get("/api/routes/bicycle", params={
+        "start_lat": -5.8, "start_lon": -35.2,
+        "end_lat": -5.9, "end_lon": -35.3,
+    })
+    assert response.status_code == 503
+    assert response.json() == {
+        "code": "Unavailable", "routes": [],
+        "error": "Serviço OSRM indisponível",
+    }

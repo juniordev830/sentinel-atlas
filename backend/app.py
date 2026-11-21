@@ -372,8 +372,13 @@ def aircraft() -> dict[str, object]:
 def bicycle(start_lat: float, start_lon: float, end_lat: float, end_lon: float) -> dict[str, object]:
     try:
         return bicycle_route(start_lat, start_lon, end_lat, end_lon)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     except SourceUnavailable as error:
-        return {"code": "Unavailable", "routes": [], "error": str(error)}
+        return JSONResponse(
+            status_code=503,
+            content={"code": "Unavailable", "routes": [], "error": str(error)},
+        )
 
 
 @app.post("/api/geofences", status_code=201)

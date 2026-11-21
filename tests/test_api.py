@@ -332,3 +332,38 @@ def test_session_signature_rejects_unicode_without_server_error(monkeypatch):
     _configure_browser_auth(monkeypatch)
     expiry = int(app_module.time.time()) + 3600
     assert app_module._valid_session_cookie(f"{expiry}.assinátura") is False
+
+
+
+@pytest.mark.parametrize(
+    "coordinates",
+    [
+        {"start_lat": 91, "start_lon": 0, "end_lat": 0, "end_lon": 0},
+        {"start_lat": 0, "start_lon": 181, "end_lat": 0, "end_lon": 0},
+        {"start_lat": 0, "start_lon": 0, "end_lat": -91, "end_lon": 0},
+        {"start_lat": 0, "start_lon": 0, "end_lat": 0, "end_lon": -181},
+        {"start_lat": "nan", "start_lon": 0, "end_lat": 0, "end_lon": 0},
+        {"start_lat": 0, "start_lon": "inf", "end_lat": 0, "end_lon": 0},
+    ],
+)
+def test_bicycle_route_rejects_invalid_coordinates(coordinates):
+    response = client.get("/api/routes/bicycle", params=coordinates)
+    assert response.status_code == 422
+
+
+def test_bicycle_route_reports_upstream_outage_with_http_503(monkeypatch):
+    from backend.source_clients import SourceUnavailable
+
+    def unavailable(*_coordinates):
+        raise SourceUnavailable("Serviço OSRM indisponível")
+
+    monkeypatch.setattr(app_module, "bicycle_route", unavailable)
+    response = client.get("/api/routes/bicycle", params={
+        "start_lat": -5.8, "start_lon": -35.2,
+        "end_lat": -5.9, "end_lon": -35.3,
+    })
+    assert response.status_code == 503
+    assert response.json() == {
+        "code": "Unavailable", "routes": [],
+        "error": "Serviço OSRM indisponível",
+    }

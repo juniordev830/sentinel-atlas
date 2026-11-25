@@ -389,3 +389,9 @@ A API exige `SENTINEL_API_TOKEN` com pelo menos 32 caracteres quando `SENTINEL_E
 Para revisar alterações neste projeto, consulte o [guia técnico de validação](docs/GUIA_DE_VALIDACAO.md), com comandos, cenários de regressão e próximos incrementos.
 
 Quando o provedor externo de rotas de bicicleta estiver indisponível, `GET /api/routes/bicycle` responde HTTP 503 com `code: "Unavailable"` e `routes: []`; coordenadas inválidas respondem HTTP 422. Essa distinção permite que clientes diferenciem erro de entrada de falha externa.
+
+## Globo em alta definição — NASA Blue Marble
+
+O seletor **Textura** oferece Automática (HD no perfil Ultra), NASA 5,4K (solicita HD em Ultra ou Equilibrado) e Padrão. A opção HD usa a composição global de janeiro de 2004 com topografia e batimetria sombreadas da [NASA Earth Observatory — Blue Marble Next Generation](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/), de 5400 × 2700 pixels. Não é imagem em tempo real nem terreno geométrico detalhado de cidades. O globo começa enquadrado na América do Sul e tem atmosfera mais suave e relevo de iluminação menos exagerado.
+
+O navegador verifica suporte a texturas de pelo menos 5400 pixels, dimensões e carregamento CORS antes de solicitar a imagem ao globo. Em caso de falha, mantém a textura padrão; o perfil Econômico e o modo noturno também usam suas texturas existentes. A imagem vem do domínio oficial da NASA, com atribuição na tela. Não são usados tiles do Google fora de seus componentes oficiais. É necessária conexão para baixar os ativos externos; o uso de memória e a aparência precisam ser verificados em navegador real.

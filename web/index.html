@@ -993,6 +993,13 @@
       @media (prefers-reduced-motion:reduce) {
         .weather-panel *, #google3d-toolbar * { animation: none !important; transition: none !important; }
       }
+      /* Atribuição da imagem base; não sobrepõe controles nem mapas Google. */
+      .earth-image-credit { position: fixed; left: 20px; bottom: 12px; z-index: 8;
+        color: #cbd5e1; font: 11px Inter, system-ui, sans-serif; pointer-events: none;
+        background: #10171de6; padding: 5px 9px; border-radius: 5px; }
+      body.map-mode .earth-image-credit { display: none; }
+      @media (max-width: 900px) { .earth-image-credit { left: 10px; bottom: 5px; font-size: 10px; } }
+      #earth-detail { min-height: 36px; background: #151e25; color: #e2e8f0; border: 1px solid #34424e; border-radius: 7px; padding: 5px 8px; }
     </style>
   </head>
   <body>
@@ -1172,6 +1179,13 @@
           <button id="replay-history">⏱️ Histórico</button>
           <button id="demo-geofence" type="button">Simular geofence</button>
           <button id="texture-toggle">🌙 Luz noturna</button>
+          <label class="render-quality-control" for="earth-detail">Textura
+            <select id="earth-detail" title="Imagem histórica de satélite, não observação ao vivo">
+              <option value="auto">Automática</option>
+              <option value="hd">NASA · 5,4K</option>
+              <option value="standard">Padrão</option>
+            </select>
+          </label>
           <label class="render-quality-control" for="render-quality">Detalhes
             <select id="render-quality" title="Qualidade de renderização do globo">
               <option value="auto">Automático</option>
@@ -1211,6 +1225,7 @@
         </div>
       </div>
     </div>
+    <div id="earth-image-credit" class="earth-image-credit" role="status" aria-live="polite">Terra · Blue Marble · imagem histórica</div>
     <div id="map" aria-label="Mapa Google com imagens de satélite e trânsito"></div>
     <div id="map-3d" aria-label="Mapa Google 3D fotorrealista"></div>
     <div id="google3d-toolbar" role="group" aria-label="Navegação no Google 3D">
@@ -1331,7 +1346,10 @@
         night: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-night.jpg',
         day: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-blue-marble.jpg',
       };
+      const detailedEarthUrl = 'https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/january/world.topo.bathy.200401.3x5400x2700.jpg';
       let currentTexture = 'day';
+      let earthTextureGeneration = 0;
+      let earthTextureChoice = null;
       let replayTimer;
       let positionSocket;
 
@@ -1412,7 +1430,7 @@
         .bumpImageUrl('https://unpkg.com/three-globe@2.43.0/example/img/earth-topology.png')
         .backgroundImageUrl('https://unpkg.com/three-globe@2.43.0/example/img/night-sky.png')
         .showAtmosphere(true)
-        .atmosphereColor('#38bdf8')
+        .atmosphereColor('#78b8f5')
         .atmosphereAltitude(0.18)
         .pointLat('lat').pointLng('lng').pointAltitude('altitude').pointColor('color').pointRadius(0.5)
         .pointLabel(d => `<div style="background:rgba(15,23,42,0.92);padding:6px 10px;border-radius:8px;border:1px solid rgba(56,189,248,0.35);font-family:sans-serif;font-size:12px;box-shadow:0 8px 16px rgba(0,0,0,0.5);"><b>${escapeHtml(d.label)}</b><br><span style="color:#94a3b8;font-size:10px;">${escapeHtml(d.type === 'earthquake' ? 'USGS · Fonte Pública' : String(d.type).toUpperCase() + ' · Ativo Tático')}</span></div>`)
@@ -1495,6 +1513,8 @@
         .ringLat('lat').ringLng('lng').ringColor('color').ringMaxRadius('maxRadius')
         .ringPropagationSpeed('propagationSpeed').ringRepeatPeriod('repeatPeriod')
         .pointsData(getFilteredPoints('all'));
+      // Enquadramento inicial da América do Sul, sem acessar localização pessoal.
+      globe.pointOfView({ lat: -12, lng: -45, altitude: 2.15 }, 0);
 
       // Iluminação solar dinâmica, aproximada com base na data/hora UTC.
       const globeMaterial = globe.globeMaterial();
@@ -1643,11 +1663,52 @@
       const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
       const renderQualityControl = document.getElementById('render-quality');
 
+      function chooseEarthTexture(preference, mode, maxTextureSize, isNight) {
+        if (isNight) return 'night';
+        if (maxTextureSize < 5400 || !Number.isFinite(maxTextureSize) || mode === 'eco') return 'day';
+        return preference === 'hd' || (preference === 'auto' && mode === 'ultra') ? 'hd' : 'day';
+      }
+
+      function refreshEarthTexture(mode) {
+        const detail = document.getElementById('earth-detail');
+        const credit = document.getElementById('earth-image-credit');
+        const maxSize = globe.renderer?.()?.capabilities?.maxTextureSize ?? 0;
+        const choice = chooseEarthTexture(detail.value, mode, maxSize, currentTexture === 'night');
+        if (choice === earthTextureChoice) return;
+        earthTextureChoice = choice;
+        const generation = ++earthTextureGeneration;
+        if (choice !== 'hd') {
+          globe.globeImageUrl(textures[choice]);
+          credit.textContent = choice === 'night' ? 'Terra · luzes noturnas históricas' :
+            detail.value === 'hd' ? 'Blue Marble padrão · HD indisponível neste perfil' :
+            'Terra · Blue Marble · imagem histórica';
+          return;
+        }
+        // Preserva a textura padrão durante a verificação CORS e de dimensões.
+        globe.globeImageUrl(textures.day);
+        credit.textContent = 'Blue Marble padrão · carregando NASA 5,4K…';
+        const image = new Image();
+        image.crossOrigin = 'anonymous';
+        const fail = () => {
+          if (generation !== earthTextureGeneration) return;
+          earthTextureChoice = 'day';
+          credit.textContent = 'Blue Marble padrão · NASA HD indisponível';
+        };
+        image.onload = () => {
+          if (generation !== earthTextureGeneration) return;
+          if (image.naturalWidth !== 5400 || image.naturalHeight !== 2700) { fail(); return; }
+          globe.globeImageUrl(detailedEarthUrl);
+          credit.textContent = 'NASA Earth Observatory · Blue Marble NG · jan/2004 · 5,4K';
+        };
+        image.onerror = fail;
+        image.src = detailedEarthUrl;
+      }
+
       function getRenderProfile(requested, devicePixelRatio = 1, compact = false, reducedMotion = false, memoryGb = 4, cpuCores = 4) {
         const modes = {
-          ultra: { dpr: 2, curvature: 1.5, points: 18, arcSegments: 96, arcRadial: 10, atmosphere: .15, bump: 1.2, clouds: true, opacity: .26 },
-          balanced: { dpr: 1.5, curvature: 3, points: 12, arcSegments: 64, arcRadial: 6, atmosphere: .13, bump: .85, clouds: true, opacity: .20 },
-          eco: { dpr: 1, curvature: 6, points: 6, arcSegments: 30, arcRadial: 4, atmosphere: .10, bump: .35, clouds: false, opacity: 0 }
+          ultra: { dpr: 2, curvature: 1.5, points: 18, arcSegments: 96, arcRadial: 10, atmosphere: .11, bump: .7, clouds: true, opacity: .26 },
+          balanced: { dpr: 1.5, curvature: 3, points: 12, arcSegments: 64, arcRadial: 6, atmosphere: .10, bump: .6, clouds: true, opacity: .20 },
+          eco: { dpr: 1, curvature: 6, points: 6, arcSegments: 30, arcRadial: 4, atmosphere: .08, bump: .35, clouds: false, opacity: 0 }
         };
         const powerfulDesktop = !compact && !reducedMotion &&
           Number(memoryGb) >= 8 && Number(cpuCores) >= 8;
@@ -1689,11 +1750,16 @@
           cloudsMesh.visible = profile.clouds;
           cloudsMesh.material.opacity = profile.opacity;
         }
+        refreshEarthTexture(profile.mode);
         renderQualityControl.dataset.resolved = profile.mode;
         renderQualityControl.title = 'Qualidade ativa: ' + profile.mode +
           ' · resolução ' + profile.pixelRatio.toFixed(2) + '×';
       }
       renderQualityControl.addEventListener('change', applyRenderQuality);
+      document.getElementById('earth-detail').addEventListener('change', () => {
+        earthTextureChoice = null;
+        refreshEarthTexture(renderQualityControl.dataset.resolved);
+      });
       motionPreference.addEventListener?.('change', () => {
         if (renderQualityControl.value === 'auto') applyRenderQuality();
       });
@@ -1833,7 +1899,7 @@
 
       document.getElementById('texture-toggle').addEventListener('click', event => {
         currentTexture = currentTexture === 'night' ? 'day' : 'night';
-        globe.globeImageUrl(textures[currentTexture]);
+        refreshEarthTexture(renderQualityControl.dataset.resolved);
         if (cityLightsMesh) cityLightsMesh.visible =
           currentTexture === 'day' && renderQualityControl.dataset.resolved !== 'eco';
         event.currentTarget.textContent = currentTexture === 'night' ? '☀️ Luz do dia' : '🌙 Luz noturna';

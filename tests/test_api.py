@@ -394,3 +394,41 @@ def test_history_filters_inclusive_range_and_remains_protected(tmp_path, monkeyp
                                 headers={"Authorization": "Bearer test-history-token"})
         assert [item["timestamp"] for item in response.json()] == [30]
     assert len(store.list_positions()) == 4
+
+
+@pytest.mark.parametrize("payload", [{"states": None}, {"states": []}])
+def test_aircraft_empty_states(monkeypatch, payload):
+    monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token=None))
+    monkeypatch.setattr(app_module, "fetch_opensky", lambda: payload)
+    assert client.get("/api/sources/aircraft").json() == {"source": "OpenSky", "count": 0, "items": []}
+
+
+def test_aircraft_invalid_payload_is_reported(monkeypatch):
+    monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token=None))
+    monkeypatch.setattr(app_module, "fetch_opensky", lambda: {"states": 123})
+    response = client.get("/api/sources/aircraft").json()
+    assert response["items"] == []
+    assert "error" in response
+
+
+@pytest.mark.parametrize("payload", [[], {"elements": None}, {"elements": {}}])
+def test_map_features_rejects_invalid_provider_envelope(monkeypatch, payload):
+    import httpx
+    monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token=None))
+    monkeypatch.setattr(httpx, "post", lambda *args, **kwargs: httpx.Response(
+        200, json=payload, request=httpx.Request("POST", "https://example.test")))
+    assert client.get("/api/map/features", params={"lat": 0, "lng": 0}).status_code == 503
+
+
+def test_map_features_skips_invalid_coordinates_and_tags(monkeypatch):
+    import httpx
+    monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token=None))
+    payload = {"elements": [None, {"lat": 91, "lon": 0}, {"lat": 0, "lon": "x"},
+                            {"lat": False, "lon": 0}, {"lat": 0, "lon": 0, "tags": [1]},
+                            {"lat": 0, "lon": 0, "tags": {"building": "yes"}, "id": 1}]}
+    monkeypatch.setattr(httpx, "post", lambda *args, **kwargs: httpx.Response(
+        200, json=payload, request=httpx.Request("POST", "https://example.test")))
+    result = client.get("/api/map/features", params={"lat": 0, "lng": 0})
+    assert result.status_code == 200
+    assert result.json()["count"] == 1
+    assert result.json()["counts"]["buildings"] == 1

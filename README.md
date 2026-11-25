@@ -389,3 +389,7 @@ A API exige `SENTINEL_API_TOKEN` com pelo menos 32 caracteres quando `SENTINEL_E
 Para revisar alterações neste projeto, consulte o [guia técnico de validação](docs/GUIA_DE_VALIDACAO.md), com comandos, cenários de regressão e próximos incrementos.
 
 Quando o provedor externo de rotas de bicicleta estiver indisponível, `GET /api/routes/bicycle` responde HTTP 503 com `code: "Unavailable"` e `routes: []`; coordenadas inválidas respondem HTTP 422. Essa distinção permite que clientes diferenciem erro de entrada de falha externa.
+
+## Modos ópticos do globo
+
+No seletor **Ótica**, escolha Natural (padrão), Monocromático, Fósforo verde ou Pseudocor. Os três últimos são filtros de cor ilustrativos sobre a renderização do globo, inclusive os marcadores: não representam câmera de visão noturna, sensor infravermelho, calor ou dados meteorológicos. Volte a Natural para interpretar as cores originais das camadas. Os filtros não modificam texturas de origem, shaders, resolução ou mapas Google. A preferência é local à sessão. O custo gráfico do filtro depende do navegador/GPU e precisa ser medido em ambiente real.

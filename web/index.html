@@ -993,6 +993,13 @@
       @media (prefers-reduced-motion:reduce) {
         .weather-panel *, #google3d-toolbar * { animation: none !important; transition: none !important; }
       }
+      /* Filtros ilustrativos somente no globo independente, nunca nos mapas Google. */
+      #globe[data-visual-preset="mono"] { filter: grayscale(1) contrast(1.08); }
+      #globe[data-visual-preset="phosphor"] { filter: grayscale(1) sepia(1) hue-rotate(75deg) saturate(1.5) contrast(1.12); }
+      #globe[data-visual-preset="pseudocolor"] { filter: hue-rotate(145deg) saturate(1.35) contrast(1.12); }
+      .visual-preset-control { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; color: #b6c5d0; font-size: 11px; }
+      #visual-preset { min-height: 36px; max-width: 100%; background: #151e25; border-color: #34424e; }
+      #visual-preset-note { color: #fcd38b; font-size: 10px; max-width: 180px; }
     </style>
   </head>
   <body>
@@ -1172,6 +1179,15 @@
           <button id="replay-history">⏱️ Histórico</button>
           <button id="demo-geofence" type="button">Simular geofence</button>
           <button id="texture-toggle">🌙 Luz noturna</button>
+          <label class="visual-preset-control" for="visual-preset">Ótica
+            <select id="visual-preset" aria-describedby="visual-preset-note">
+              <option value="natural">Natural</option>
+              <option value="mono">Monocromático</option>
+              <option value="phosphor">Fósforo verde · simulado</option>
+              <option value="pseudocolor">Pseudocor · simulado</option>
+            </select>
+          </label>
+          <span id="visual-preset-note" role="status" aria-live="polite">Globo independente · cores naturais</span>
           <label class="render-quality-control" for="render-quality">Detalhes
             <select id="render-quality" title="Qualidade de renderização do globo">
               <option value="auto">Automático</option>
@@ -1701,6 +1717,21 @@
         if (renderQualityControl.value === 'auto') applyRenderQuality();
       });
       applyRenderQuality();
+
+      function applyVisualPreset(value, target, note) {
+        const allowed = ['natural', 'mono', 'phosphor', 'pseudocolor'];
+        const selected = allowed.includes(value) ? value : 'natural';
+        target.dataset.visualPreset = selected;
+        note.textContent = selected === 'natural'
+          ? 'Globo independente · cores naturais'
+          : 'Filtro ilustrativo · não é sensor, infravermelho ou medição térmica';
+        return selected;
+      }
+      const visualPreset = document.getElementById('visual-preset');
+      const visualPresetNote = document.getElementById('visual-preset-note');
+      visualPreset.addEventListener('change', () => {
+        visualPreset.value = applyVisualPreset(visualPreset.value, document.getElementById('globe'), visualPresetNote);
+      });
 
       const rotationToggle = document.getElementById('rotation-toggle');
       let rotationRequested = !motionPreference.matches;

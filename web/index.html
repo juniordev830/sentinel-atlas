@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#070b16" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <title>Sentinel Atlas · God’s Eye View</title>
+    <title>OSIRIS · Plataforma geoespacial</title>
+    <script src="/osiris.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -1059,6 +1060,20 @@
       body.map-mode .earth-image-credit { display: none; }
       @media (max-width: 900px) { .earth-image-credit { left: 10px; bottom: 5px; font-size: 10px; } }
       #earth-detail { min-height: 36px; background: #151e25; color: #e2e8f0; border: 1px solid #34424e; border-radius: 7px; padding: 5px 8px; }
+      /* OSIRIS: acabamento fosco e retículo opcional; preserva o material WebGL. */
+      .hud .brand { border-radius: 4px; border-left: 2px solid #83b5c7; }
+      .hud .brand strong { letter-spacing: .28em; color: #e7eff3; }
+      .hud .brand small { color: #95b4c2; letter-spacing: .13em; }
+      .osiris-navigation { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; pointer-events: auto; }
+      .osiris-navigation button, .osiris-navigation a { border: 1px solid #354651; border-radius: 4px; background: #142028; color: #d5e1e7; padding: 8px 10px; min-height: 36px; font: 11px 'JetBrains Mono', monospace; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+      .osiris-navigation button[aria-pressed="true"] { border-color: #85b9c9; background: #23343e; color: #eaf7fb; }
+      .osiris-navigation a:focus-visible, .osiris-navigation button:focus-visible { outline: 2px solid #9cd0e4; outline-offset: 2px; }
+      body:not(.osiris-tactical) .tactical-overlay { display: none; }
+      body.focus-mode .osiris-navigation { display: none; }
+      body.osiris-tactical .tactical-reticle { width: 112px; height: 112px; border-color: #83b5c755; box-shadow: 0 0 0 24px #83b5c716, 0 0 0 54px #83b5c70b; }
+      body.osiris-tactical .tactical-overlay::after { animation: none; opacity: .12; }
+      body.osiris-tactical .hud .panel { border-color: #334b57; }
+      @media(max-width:900px) { .osiris-navigation { justify-content: flex-end; } .osiris-navigation button, .osiris-navigation a { min-height: 32px; padding: 5px 8px; } }
     </style>
   </head>
   <body>
@@ -1073,16 +1088,16 @@
       <span class="tactical-corner bl"></span>
       <span class="tactical-corner br"></span>
       <div class="tactical-reticle"></div>
-      <span class="tactical-caption">GEOINT · VISUALIZAÇÃO EXPERIMENTAL</span>
+      <span class="tactical-caption">OSIRIS · REFERÊNCIA VISUAL · NÃO É RADAR</span>
     </div>
     <div class="hud">
       <div class="topbar">
         <div class="brand">
           <div class="brand-icon"></div>
           <div>
-            <strong>Sentinel Atlas</strong>
-            <span>GeoInt & Geofencing Platform · v0.2</span>
-            <small>COMMAND CENTER / ATLAS</small>
+            <strong>OSIRIS</strong>
+            <span>Inteligência geoespacial · Sentinel Atlas</span>
+            <small>OSIRIS / COMMAND SYSTEM</small>
           </div>
         </div>
         <div class="tools">
@@ -1091,6 +1106,11 @@
             <span id="search-feedback" aria-live="polite">TODOS</span>
           </div>
           <div id="api-status" class="panel status" role="status" aria-live="polite">DEMONSTRAÇÃO · dados simulados</div>
+          <nav class="osiris-navigation" aria-label="Modos OSIRIS">
+            <button id="osiris-natural" type="button" aria-pressed="true">Natural</button>
+            <button id="osiris-tactical" type="button" aria-pressed="false">Tático</button>
+            <a href="/operations.html">Operações</a>
+          </nav>
           <button id="focus-mode" aria-pressed="false" title="Ocultar painéis para ampliar a visualização do globo">◫ Tela limpa</button>
         </div>
       </div>

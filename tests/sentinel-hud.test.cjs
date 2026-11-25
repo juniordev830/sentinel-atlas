@@ -793,3 +793,40 @@ test('shader de cidades só ativa sobre o lado noturno e respeita perfil econôm
   assert.match(html, /cityLightsMesh\.material\.uniforms\.sunVector\.value\.copy\(sun\.position\)\.normalize\(\)/);
   assert.doesNotMatch(snippet('function loadCityLights()', '// Nuvens independentes'), /maps\.googleapis\.com/);
 });
+
+
+test('anotações fecham áreas e preservam os vértices originais', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function annotationSegments(', 'let annotationDraft =') +
+    '\nglobalThis.annotationSegments = annotationSegments;', context);
+  const vertices = [{lat: -5, lng: -35}, {lat: -6, lng: -35}, {lat: -6, lng: -36}];
+  const edges = context.annotationSegments('area', vertices);
+  assert.equal(edges.length, 3);
+  assert.equal(edges[2].endLat, -5);
+  assert.equal(edges[2].endLng, -35);
+  assert.equal(vertices.length, 3);
+  assert.equal(context.annotationSegments('line', vertices).length, 2);
+  assert.equal(context.annotationSegments('pin', vertices.slice(0, 1)).length, 0);
+});
+
+test('anotações rejeitam coordenadas inválidas e formas incompletas', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function annotationSegments(', 'let annotationDraft =') +
+    '\nglobalThis.annotationSegments = annotationSegments;', context);
+  for (const [kind, vertices] of [
+    ['area', [{lat: 0, lng: 0}]], ['line', [{lat: 0, lng: 0}]],
+    ['pin', [{lat: 91, lng: 0}]], ['pin', [{lat: 0, lng: Infinity}]],
+    ['pin', [{lat: 0, lng: 0}, {lat: 1, lng: 1}]], ['invalid', []],
+    ['line', Array.from({length: 101}, () => ({lat: 0, lng: 0}))]
+  ]) assert.throws(() => context.annotationSegments(kind, vertices));
+});
+
+test('anotações não enviam coordenadas ao servidor durante o desenho', () => {
+  const callback = snippet('.onGlobeClick(async ({ lat, lng }) => {', 'const res = await fetch(`/api/location/info');
+  assert.ok(callback.indexOf('annotationDraft.vertices.push') < callback.indexOf('const inspector'));
+  assert.match(callback, /return;/);
+  const renderer = snippet('function renderLocalAnnotations()', "annotationToggle.addEventListener('click'");
+  assert.match(renderer, /item.textContent = shape.name/);
+  assert.doesNotMatch(renderer, /innerHTML|fetch\(/);
+  assert.match(renderer, /replaceAssets\('annotation', points\)/);
+});

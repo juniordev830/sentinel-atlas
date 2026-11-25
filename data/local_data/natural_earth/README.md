@@ -1,14 +1,14 @@
 # Natural Earth packs
 
 Offline named-region polygons for the voice-annotation resolver
-(`src/data/naturalEarthRegions.js`) — "outline the Alps" resolves to the real
+(`data/naturalEarthRegions.js`) — "outline the Alps" resolves to the real
 range geometry with no network dependency.
 
 | File | Source dataset | Features |
 |------|----------------|----------|
 | `regions.json` | `ne_10m_geography_regions_polys` (ranges, deserts, plateaus, peninsulas, islands, …) | 1,046 named |
 | `marine.json` | `ne_10m_geography_marine_polys` (seas, gulfs, straits, bays, …) | 292 named |
-| `countries.json` | `ne_10m_admin_0_countries` (countries) | 256 |
+| `countries.json` | `ne_10m_admin_0_countries` and UK map units | 260 features |
 | `states_provinces.json` | `ne_10m_admin_1_states_provinces` (states, provinces and other first-level units) | 4,587 named |
 
 **Source:** Natural Earth 10m physical vectors, via the canonical
@@ -32,7 +32,7 @@ See DATA_SOURCES.md.
 - Zero-area sliver artifacts dropped. Two marine features are ONLY slivers in
   the source and are therefore absent: **Drake Passage** and **Luzon Strait**.
 - Result: 7.3 MB source → 2.5 MB pack (budget ≤3 MB, enforced by
-  `src/data/naturalEarthRegions.test.mjs`).
+  `data/naturalEarthRegions.test.mjs`).
 
 Duplicate names exist upstream (two "Cordillera Oriental", a sliver + real
 "Canadian Shield", …); the lookup module resolves ties by largest area.
@@ -40,7 +40,7 @@ Duplicate names exist upstream (two "Cordillera Oriental", a sliver + real
 ## States and provinces (`states_provinces.json`)
 
 Worldwide first-level administrative units for area annotations ("outline
-Texas", "outline Bavaria"), read by `src/data/adminBoundaries.js`.
+Texas", "outline Bavaria"), read by `data/adminBoundaries.js`.
 
 **Source:** `geojson/ne_10m_admin_1_states_provinces.geojson` from
 [nvkelso/natural-earth-vector](https://github.com/nvkelso/natural-earth-vector)
@@ -53,10 +53,9 @@ only to mark ambiguous names; none of it is bundled.
 
 **License:** public domain, as above.
 
-**Regenerate:** `node scripts/build-admin-packs.mjs --only admin1` downloads
-the pinned files (to the system temp directory, or `--cache <dir>`), checks
-their SHA-256 and rewrites the pack byte for byte. Parameters are in the
-script's `PARAMS` and in the pack's `meta.curation`.
+**Regeneration:** The original process used `scripts/build-admin-packs.mjs`,
+which is not present in this repository. The command cannot be run from this
+checkout; source and curation metadata remain recorded in the pack.
 
 **Schema:** `meta` (source, URLs, hashes, license, curation) and `features[]`
 with `name`, `nameEn` (when it differs), `alt[]` (Latin-script `name_alt`
@@ -95,7 +94,8 @@ and each later one as a `[dLon, dLat]` delta.
 Natural Earth 10m admin-0 countries, public domain under the terms above.
 Source: `geojson/ne_10m_admin_0_countries.geojson` at the same pinned commit;
 SHA-256 `239eec57ac17f100a11e2536cffc56752c318b50ae765b0918ff7aab4ce8f255`.
-Regenerate with `node scripts/build-admin-packs.mjs --only countries`.
+The original regeneration script is not present in this repository; see the
+regeneration note above.
 Uses the state/province encoding and simplification, retaining parts of at least
 20 km² and 0.003% of the largest part (including Alaska and Hawaii); the largest
 part always stays. Holes under 20 km² are dropped.

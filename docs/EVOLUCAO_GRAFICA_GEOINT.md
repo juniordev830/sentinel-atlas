@@ -2,6 +2,8 @@
 
 Referência conceitual fornecida pelo mantenedor: God's Eye View (https://github.com/bilawalsidhu/gods-eye-view). Esta especificação descreve trabalho próprio; não incorpora código, imagens ou bases de terceiros sem conferência de suas licenças e atribuições.
 
+> Este documento é um plano de evolução, não um inventário atualizado da implementação. Itens marcados como pendentes podem ter mudado; confirme o estado no código e nos testes antes de tomar decisões.
+
 ## Interface
 - [x] Painéis grafite foscos, botões discretos, foco visível e movimento reduzido.
 - [x] Limpeza individual das camadas consultadas, sem excluir histórico GPS.

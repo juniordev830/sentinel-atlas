@@ -793,3 +793,31 @@ test('shader de cidades só ativa sobre o lado noturno e respeita perfil econôm
   assert.match(html, /cityLightsMesh\.material\.uniforms\.sunVector\.value\.copy\(sun\.position\)\.normalize\(\)/);
   assert.doesNotMatch(snippet('function loadCityLights()', '// Nuvens independentes'), /maps\.googleapis\.com/);
 });
+
+
+test('interface fosca preserva a renderização do globo e o foco visível', () => {
+  const css = snippet('/* Interface fosca:', '</style>');
+  assert.match(css, /backdrop-filter: none/);
+  assert.match(css, /--panel: #10171d/);
+  assert.match(css, /focus-visible/);
+  assert.doesNotMatch(css, /#globe|canvas|globeImageUrl/);
+});
+
+test('limpar uma camada GeoINT não remove dados das outras camadas', () => {
+  const updates = [];
+  const context = { replaceAssets(type, points) { updates.push([type, points.length]); } };
+  vm.runInNewContext(snippet('function clearGeointLayer(', 'function safeGeointExternalLink(') +
+    '\nglobalThis.clearGeointLayer = clearGeointLayer;', context);
+  const output = { textContent: '' };
+  context.clearGeointLayer({ id: 'weather' }, output);
+  assert.deepEqual(updates, [['geoint-weather', 0]]);
+  assert.match(output.textContent, /Camada removida/);
+});
+
+test('painel de consulta diferencia natureza e horário do dado da consulta', () => {
+  const code = snippet('async function queryGeointLayer(', 'async function loadGeointCatalog(');
+  assert.match(code, /observedAt: item.timestamp/);
+  assert.match(code, /fetchedAt: data.fetched_at/);
+  assert.match(code, /source: String\(data.provider/);
+  assert.match(code, /dataKind: String/);
+});

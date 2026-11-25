@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Atlas Intelligence · Sentinel Atlas</title>
+  <link rel="stylesheet" href="/intelligence.css">
+  <script src="/intelligence.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div><span class="eyebrow">SENTINEL ATLAS / GEOINT</span><h1>Atlas Intelligence</h1></div>
+    <a class="button" href="/">← Voltar ao globo</a>
+    <span class="local">● Sessão local</span>
+  </header>
+  <main>
+    <aside class="panel library">
+      <div class="section-title"><h2>Acervo de análise</h2><span id="file-count" class="mono">0 / 20</span></div>
+      <label class="upload" for="files">＋ Importar arquivos</label>
+      <input id="files" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.txt,.md,.csv,.json">
+      <p class="muted">Imagens e textos autorizados. Até 20 arquivos, 12 MB por imagem ou 1 MB por texto; total de 60 MB. Não há envio ao servidor.</p>
+      <label for="search">Pesquisar nome ou texto</label>
+      <input id="search" type="search" placeholder="Buscar no acervo">
+      <div id="search-status" class="muted" aria-live="polite"></div>
+      <ul id="library"></ul>
+      <button id="clear" type="button">Limpar sessão</button>
+    </aside>
+    <section class="panel workspace">
+      <div class="section-title"><h2>Comparação de imagens</h2><span class="eyebrow">VIS / LOCAL</span></div>
+      <div class="select-grid">
+        <label>Imagem A <select id="image-a"><option value="">Nenhuma</option></select></label>
+        <label>Imagem B <select id="image-b"><option value="">Nenhuma</option></select></label>
+      </div>
+      <div id="comparison" class="comparison">
+        <figure><div class="viewport"><img id="preview-a" alt="Imagem A importada" hidden><span id="empty-a">Selecione uma imagem A</span></div><figcaption id="caption-a">A · sem arquivo</figcaption></figure>
+        <figure><div class="viewport"><img id="preview-b" alt="Imagem B importada" hidden><span id="empty-b">Selecione uma imagem B</span></div><figcaption id="caption-b">B · sem arquivo</figcaption></figure>
+      </div>
+      <div class="tools">
+        <label><input id="overlay" type="checkbox"> Sobreposição visual</label>
+        <label>Opacidade B <input id="opacity" type="range" min="0" max="100" value="50" disabled><output id="opacity-value">50%</output></label>
+      </div>
+      <p id="compare-note" class="muted">Comparação visual manual, sem alinhamento geográfico, inferência automática de mudanças ou data de captura verificada.</p>
+      <div class="section-title"><h2>Leitura de documento</h2><span class="eyebrow">TEXT / LOCAL</span></div>
+      <label>Documento <select id="document-select"><option value="">Nenhum</option></select></label>
+      <pre id="document-preview" tabindex="0">Selecione um documento textual importado.</pre>
+    </section>
+    <aside class="panel analysis">
+      <div class="section-title"><h2>Telemetria do acervo</h2><span class="eyebrow">LOCAL</span></div>
+      <dl class="metrics"><div><dt>Imagens</dt><dd id="image-count">0</dd></div><div><dt>Textos</dt><dd id="text-count">0</dd></div><div><dt>Volume</dt><dd id="volume">0 MB</dd></div></dl>
+      <div class="progress"><progress id="progress" value="0" max="1"></progress><span id="progress-text" role="status">Nenhuma importação</span></div>
+      <div class="section-title"><h2>Anotações</h2></div>
+      <textarea id="notes" rows="7" maxlength="4000" placeholder="Registre suas observações e a procedência das imagens..."></textarea>
+      <button id="report" type="button">Exportar relatório JSON</button>
+      <p class="muted">Relatório com nomes, tamanhos, dimensões, seleções e anotações. Sem copiar o conteúdo dos arquivos.</p>
+      <div class="section-title"><h2>Histórico da sessão</h2></div>
+      <ol id="history"></ol>
+    </aside>
+  </main>
+  <footer><span>ATLAS INTELLIGENCE / análise documental</span><span>Sem reconhecimento biométrico · sem coleta externa · arquivos em memória</span></footer>
+</body>
+</html>

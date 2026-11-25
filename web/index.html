@@ -1059,6 +1059,9 @@
       body.map-mode .earth-image-credit { display: none; }
       @media (max-width: 900px) { .earth-image-credit { left: 10px; bottom: 5px; font-size: 10px; } }
       #earth-detail { min-height: 36px; background: #151e25; color: #e2e8f0; border: 1px solid #34424e; border-radius: 7px; padding: 5px 8px; }
+      .intelligence-link { display:inline-flex; align-items:center; min-height:36px; padding:8px 11px; border:1px solid #34424e; border-radius:6px; background:#182129; color:#dce6ee; font-size:11px; text-decoration:none; white-space:nowrap; }
+      .intelligence-link:hover { background:#253746; }
+      .intelligence-link:focus-visible { outline:2px solid #83c6ed; outline-offset:2px; }
     </style>
   </head>
   <body>
@@ -1091,6 +1094,7 @@
             <span id="search-feedback" aria-live="polite">TODOS</span>
           </div>
           <div id="api-status" class="panel status" role="status" aria-live="polite">DEMONSTRAÇÃO · dados simulados</div>
+          <a href="/intelligence.html" class="intelligence-link" title="Abrir módulo local de análise de imagens e documentos">Atlas Intelligence</a>
           <button id="focus-mode" aria-pressed="false" title="Ocultar painéis para ampliar a visualização do globo">◫ Tela limpa</button>
         </div>
       </div>

@@ -928,3 +928,43 @@ test('textura HD preserva imagem anterior e ignora resposta atrasada no modo not
   assert.equal(calls.at(-1), 'hd.jpg');
   assert.match(credit.textContent, /NASA Earth Observatory/);
 });
+
+
+test('Atlas Intelligence valida extensões e limites de arquivos locais', () => {
+  const {classifyFile,validateFile} = require('../web/intelligence.js');
+  assert.equal(classifyFile({name:'Mapa.PNG'}),'image');
+  assert.equal(classifyFile({name:'observacoes.md'}),'text');
+  assert.equal(classifyFile({name:'malicioso.svg'}),null);
+  assert.equal(validateFile({name:'vazio.txt',size:0},0,0),'Arquivo vazio ou inválido');
+  assert.equal(validateFile({name:'mapa.png',size:1024},20,0),'Limite de arquivos atingido');
+  assert.equal(validateFile({name:'texto.txt',size:1048577},0,0),'Arquivo excede o limite individual');
+  assert.equal(validateFile({name:'mapa.jpg',size:1024},5,60*1048576),'Limite total de memória atingido');
+  assert.equal(validateFile({name:'mapa.webp',size:1024},0,0),null);
+});
+
+test('Atlas Intelligence pesquisa texto sem executar conteúdo importado', () => {
+  const {matchesFile} = require('../web/intelligence.js');
+  assert.equal(matchesFile({name:'Relatório.md',kind:'text',text:'Imagem de NATAL'},'natal'),true);
+  assert.equal(matchesFile({name:'Mapa.jpg',kind:'image',text:'segredo'},'segredo'),false);
+  assert.equal(matchesFile({name:'Mapa.jpg',kind:'image'},'mapa'),true);
+});
+
+test('relatório de Atlas Intelligence não incorpora texto ou URLs de arquivos', () => {
+  const {buildReport} = require('../web/intelligence.js');
+  const report=buildReport([
+    {id:1,name:'mapa.png',kind:'image',size:100,width:20,height:5,url:'blob:local'},
+    {id:2,name:'texto.txt',kind:'text',size:42,text:'conteudo reservado'}
+  ],{a:'1',b:'',document:'2'},'Anotação',new Date('2026-11-25T12:00:00Z'));
+  assert.equal(report.files[0].width,20);
+  assert.equal(report.selections.b,null);
+  assert.equal(report.notes,'Anotação');
+  assert.doesNotMatch(JSON.stringify(report),/blob:local|conteudo reservado/);
+});
+
+test('Atlas Intelligence tem acesso pelo globo e não envia arquivos à rede', () => {
+  const fs=require('node:fs'), path=require('node:path');
+  const code=fs.readFileSync(path.join(__dirname,'../web/intelligence.js'),'utf8');
+  assert.match(html,/href="\/intelligence.html"/);
+  assert.doesNotMatch(code,/\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\.innerHTML\s*=/);
+  assert.match(code,/URL\.revokeObjectURL/);
+});

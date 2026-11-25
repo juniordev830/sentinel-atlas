@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import math
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -97,11 +98,28 @@ class GeofenceStore:
                             (SELECT id FROM positions ORDER BY id DESC LIMIT ?)
                     """, (POSITION_RETENTION_LIMIT,))
 
-    def list_positions(self, limit: int = 100) -> list[Position]:
+    def list_positions(self, limit: int = 100, *, start: float | None = None,
+                       end: float | None = None) -> list[Position]:
+        """Consultas inclusivas por timestamp Unix; não alteram a retenção."""
+        for value in (start, end):
+            if value is not None and (not math.isfinite(value) or value < 0):
+                raise ValueError("Timestamp inválido")
+        if start is not None and end is not None and start > end:
+            raise ValueError("O início não pode ser posterior ao fim")
+        conditions, params = [], []
+        if start is not None:
+            conditions.append("timestamp >= ?")
+            params.append(start)
+        if end is not None:
+            conditions.append("timestamp <= ?")
+            params.append(end)
+        where = " WHERE " + " AND ".join(conditions) if conditions else ""
         safe_limit = max(1, min(limit, 1000))
+        params.append(safe_limit)
         with closing(self._connect()) as connection:
             rows = connection.execute(
-                "SELECT latitude, longitude, timestamp FROM positions ORDER BY timestamp DESC, id DESC LIMIT ?",
-                (safe_limit,),
+                "SELECT latitude, longitude, timestamp FROM positions" + where +
+                " ORDER BY timestamp DESC, id DESC LIMIT ?",
+                params,
             ).fetchall()
         return [Position(*row) for row in rows]

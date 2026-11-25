@@ -389,3 +389,7 @@ A API exige `SENTINEL_API_TOKEN` com pelo menos 32 caracteres quando `SENTINEL_E
 Para revisar alterações neste projeto, consulte o [guia técnico de validação](docs/GUIA_DE_VALIDACAO.md), com comandos, cenários de regressão e próximos incrementos.
 
 Quando o provedor externo de rotas de bicicleta estiver indisponível, `GET /api/routes/bicycle` responde HTTP 503 com `code: "Unavailable"` e `routes: []`; coordenadas inválidas respondem HTTP 422. Essa distinção permite que clientes diferenciem erro de entrada de falha externa.
+
+## Modo diretor: anotações no globo
+
+Abra **Desenhar**, escolha Pino, Linha ou Área (contorno), informe um nome e clique em Começar. Clique nos pontos desejados do globo 3D e depois em Concluir (mínimo de 1, 2 ou 3 vértices, respectivamente). Use Cancelar para descartar o rascunho ou Remover para excluir uma anotação concluída. As linhas são arcos visuais, não rotas viárias nem limites oficiais; o contorno não é uma medição de área. As anotações são locais à sessão, sem persistência após recarregar, e não enviam coordenadas ao backend durante a criação. Limites: 30 anotações e 100 vértices por forma. O painel não opera no mapa Google. Os testes de geometria e isolamento são executados por `node --test tests/sentinel-hud.test.cjs`; validar também a interação em navegador com WebGL.

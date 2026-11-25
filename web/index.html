@@ -993,6 +993,14 @@
       @media (prefers-reduced-motion:reduce) {
         .weather-panel *, #google3d-toolbar * { animation: none !important; transition: none !important; }
       }
+      .annotation-panel { position: fixed; top: 86px; left: 20px; width: min(340px, calc(100vw - 40px)); max-height: 50dvh; overflow: auto; z-index: 20; pointer-events: auto; background: #10171d; border-color: #29343e; box-shadow: 0 4px 14px #0004; backdrop-filter: none; }
+      .annotation-panel[hidden], body.focus-mode .annotation-panel, body.map-mode .annotation-panel { display: none; }
+      .annotation-panel header, .annotation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
+      .annotation-panel label { display: block; margin: 8px 0; }
+      .annotation-panel input, .annotation-panel select { max-width: 100%; width: 100%; border-radius: 8px; }
+      .annotation-panel p, .annotation-panel li { color: #c1cbd4; font-size: 12px; line-height: 1.5; }
+      .annotation-panel ol { padding-left: 18px; }
+      .annotation-panel li button { margin-left: 8px; }
     </style>
   </head>
   <body>
@@ -1029,6 +1037,19 @@
         </div>
       </div>
 
+      <section id="annotation-panel" class="panel annotation-panel" hidden aria-label="Anotações locais">
+        <header><strong>Modo diretor · Anotações</strong><button id="annotation-close" type="button" aria-label="Fechar anotações">✕</button></header>
+        <p>Desenhe no globo. As anotações ficam apenas nesta sessão, sem envio ao servidor.</p>
+        <label>Forma <select id="annotation-kind"><option value="pin">Pino</option><option value="line">Linha</option><option value="area">Área (contorno)</option></select></label>
+        <label>Nome <input id="annotation-name" maxlength="80" placeholder="Nome da anotação" /></label>
+        <div class="annotation-actions">
+          <button id="annotation-start" type="button">Começar</button>
+          <button id="annotation-finish" type="button" disabled>Concluir</button>
+          <button id="annotation-cancel" type="button" disabled>Cancelar</button>
+        </div>
+        <p id="annotation-status" role="status" aria-live="polite">Selecione uma forma para começar.</p>
+        <ol id="annotation-list" aria-label="Anotações criadas"></ol>
+      </section>
       <section id="geoint-panel" class="panel geoint-sources-panel" hidden aria-label="Catálogo de fontes geoespaciais">
         <div class="geoint-panel-header">
           <strong>🌍 Fontes GeoINT · 16 categorias</strong>
@@ -1196,6 +1217,7 @@
           <button id="google-3d-view" type="button" aria-pressed="false" title="Visão fotorrealista oficial do Google Maps; pode gerar custos de API">🏙️ Google 3D</button>
           <button id="weather-toggle" type="button" aria-expanded="false" aria-controls="weather-panel">☁ Meteorologia</button>
           <span id="solar-status" class="solar-caption" title="Posição solar estimada pelo horário UTC">☀ Sol UTC · estimado</span>
+          <button id="annotation-toggle" type="button" aria-expanded="false" aria-controls="annotation-panel">✎ Desenhar</button>
           <button id="toggle-geoint" type="button" aria-expanded="false" aria-controls="geoint-panel">🌐 Fontes GeoINT</button>
           <button id="toggle-ai" style="border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,0.15);">🤖 Copiloto IA</button>
             </div>
@@ -1407,6 +1429,26 @@
         })[character]);
       }
 
+      // Anotações locais independentes das fontes externas e do GPS.
+      function annotationSegments(kind, vertices) {
+        if (!['pin', 'line', 'area'].includes(kind)) throw new Error('Forma inválida');
+        const minimum = {pin: 1, line: 2, area: 3}[kind];
+        if (!Array.isArray(vertices) || vertices.length < minimum || vertices.length > 100 ||
+            (kind === 'pin' && vertices.length !== 1) ||
+            vertices.some(p => !p || !Number.isFinite(p.lat) || !Number.isFinite(p.lng) ||
+              Math.abs(p.lat) > 90 || Math.abs(p.lng) > 180)) {
+          throw new Error('Quantidade ou coordenadas de vértices inválidas');
+        }
+        const sequence = kind === 'area' ? [...vertices, vertices[0]] : vertices;
+        return sequence.slice(1).map((p, i) => ({
+          startLat: sequence[i].lat, startLng: sequence[i].lng,
+          endLat: p.lat, endLng: p.lng, color: '#a5b4fc'
+        }));
+      }
+
+      let annotationDraft = null;
+      let annotationSequence = 0;
+      const localAnnotations = [];
       const globe = Globe()(document.getElementById('globe'))
         .globeImageUrl(textures[currentTexture])
         .bumpImageUrl('https://unpkg.com/three-globe@2.43.0/example/img/earth-topology.png')
@@ -1422,6 +1464,15 @@
           inspector.hidden = false;
         })
         .onGlobeClick(async ({ lat, lng }) => {
+          if (annotationDraft && !document.body.classList.contains('focus-mode') && !document.body.classList.contains('map-mode')) {
+            if (annotationDraft.vertices.length >= 100 || (annotationDraft.kind === 'pin' && annotationDraft.vertices.length)) {
+              document.getElementById('annotation-status').textContent = 'Limite de vértices atingido. Conclua ou cancele.';
+              return;
+            }
+            annotationDraft.vertices.push({lat, lng});
+            document.getElementById('annotation-status').textContent = annotationDraft.vertices.length + ' vértice(s). Conclua quando terminar.';
+            return;
+          }
           const inspector = document.getElementById('inspector');
           inspector.hidden = false;
           inspector.innerHTML = `<strong>🌐 Pesquisando Região...</strong><small>LAT: ${lat.toFixed(4)}° | LNG: ${lng.toFixed(4)}°<br>Consultando inteligência demográfica e empresarial...</small>`;
@@ -1495,6 +1546,72 @@
         .ringLat('lat').ringLng('lng').ringColor('color').ringMaxRadius('maxRadius')
         .ringPropagationSpeed('propagationSpeed').ringRepeatPeriod('repeatPeriod')
         .pointsData(getFilteredPoints('all'));
+
+      const annotationPanel = document.getElementById('annotation-panel');
+      const annotationToggle = document.getElementById('annotation-toggle');
+      const annotationStatus = document.getElementById('annotation-status');
+      const annotationFinish = document.getElementById('annotation-finish');
+      const annotationCancel = document.getElementById('annotation-cancel');
+      function resetAnnotationDraft() {
+        annotationDraft = null;
+        annotationFinish.disabled = true;
+        annotationCancel.disabled = true;
+      }
+      function showAnnotations(enabled) {
+        annotationPanel.hidden = !enabled;
+        annotationToggle.setAttribute('aria-expanded', String(enabled));
+        if (!enabled) resetAnnotationDraft();
+      }
+      function renderLocalAnnotations() {
+        const points = localAnnotations.flatMap(shape => shape.vertices.map((vertex, i) => ({
+          id: 'annotation-' + shape.id + '-' + i, type: 'annotation',
+          lat: vertex.lat, lng: vertex.lng, altitude: .025, color: '#a5b4fc',
+          label: shape.name + ' · Anotação local'
+        })));
+        replaceAssets('annotation', points);
+        globe.arcsData([...pathTrails, ...localAnnotations.flatMap(shape => annotationSegments(shape.kind, shape.vertices))]);
+        const list = document.getElementById('annotation-list');
+        list.replaceChildren();
+        for (const shape of localAnnotations) {
+          const item = document.createElement('li');
+          item.textContent = shape.name + ' · ' + shape.vertices.length + ' vértice(s)';
+          const remove = document.createElement('button');
+          remove.type = 'button'; remove.textContent = 'Remover';
+          remove.setAttribute('aria-label', 'Remover ' + shape.name);
+          remove.addEventListener('click', () => {
+            const index = localAnnotations.indexOf(shape);
+            if (index >= 0) localAnnotations.splice(index, 1);
+            renderLocalAnnotations();
+          });
+          item.append(remove); list.append(item);
+        }
+      }
+      annotationToggle.addEventListener('click', () => {
+        if (document.body.classList.contains('map-mode')) setMapView(false);
+        showAnnotations(annotationPanel.hidden);
+      });
+      document.getElementById('annotation-close').addEventListener('click', () => showAnnotations(false));
+      document.getElementById('annotation-start').addEventListener('click', () => {
+        if (localAnnotations.length >= 30) {
+          annotationStatus.textContent = 'Limite de 30 anotações. Remova uma para continuar.';
+          return;
+        }
+        annotationDraft = {kind: document.getElementById('annotation-kind').value, vertices: []};
+        annotationFinish.disabled = false; annotationCancel.disabled = false;
+        annotationStatus.textContent = 'Clique no globo para adicionar vértices.';
+      });
+      annotationCancel.addEventListener('click', () => {
+        resetAnnotationDraft(); annotationStatus.textContent = 'Desenho cancelado.';
+      });
+      annotationFinish.addEventListener('click', () => {
+        if (!annotationDraft) return;
+        try { annotationSegments(annotationDraft.kind, annotationDraft.vertices); }
+        catch (error) { annotationStatus.textContent = error.message; return; }
+        const name = document.getElementById('annotation-name').value.trim().slice(0, 80) || 'Anotação ' + (annotationSequence + 1);
+        localAnnotations.push({...annotationDraft, name, id: ++annotationSequence});
+        resetAnnotationDraft(); renderLocalAnnotations();
+        annotationStatus.textContent = 'Anotação concluída nesta sessão.';
+      });
 
       // Iluminação solar dinâmica, aproximada com base na data/hora UTC.
       const globeMaterial = globe.globeMaterial();

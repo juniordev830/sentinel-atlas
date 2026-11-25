@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>OSIRIS · Central de operações</title>
+<link rel="stylesheet" href="/operations.css">
+<script src="/operations.js" defer></script>
+</head>
+<body>
+<header><div><p class="kicker">SENTINEL ATLAS / OSIRIS</p><h1>Central de operações</h1></div><nav aria-label="Navegação"><a href="/">Globo geoespacial</a><button id="refresh" type="button">Consultar estado</button></nav></header>
+<main>
+<section aria-label="Estado operacional" class="metrics">
+<article><h2>API local</h2><strong id="api">Não consultada</strong></article>
+<article><h2>Fontes cadastradas</h2><strong id="total">—</strong></article>
+<article><h2>Configuração necessária</h2><strong id="pending">—</strong></article>
+<article><h2>Última consulta local</h2><strong id="last">—</strong></article>
+</section>
+<section class="panel"><div class="heading"><div><p class="kicker">CATÁLOGO / GEOINT</p><h2>Fontes e natureza dos dados</h2></div><label for="filter">Filtrar fontes<select id="filter"><option value="all">Todas</option><option value="ready">Prontas para consulta</option><option value="requires_configuration">Requer configuração</option><option value="external_view">Visualizador externo</option><option value="needs_region">Requer região</option></select></label></div>
+<p id="status" role="status">Clique em Consultar estado. O catálogo não verifica a disponibilidade dos provedores externos.</p>
+<div id="sources" class="sources"></div>
+</section>
+<section class="panel note"><h2>Integridade da informação</h2><p>O estado de configuração não equivale a uma transmissão ativa. Dados de demonstração, observações, estimativas orbitais e modelos devem ser diferenciados. Esta tela consulta somente a API local e o catálogo; não inicia monitoramento externo, acesso a câmeras ou coleta de localização.</p></section>
+</main>
+<footer>OSIRIS · Sistema geoespacial experimental · Sem identificação biométrica ou vigilância de pessoas</footer>
+</body>
+</html>

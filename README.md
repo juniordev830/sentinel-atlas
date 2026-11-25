@@ -1,4 +1,4 @@
-# Sentinel Atlas
+# OSIRIS · Sentinel Atlas
 
 > Plataforma experimental de monitoramento geoespacial com geofencing, visualização 3D e uma API para ingestão e consulta de posições.
 
@@ -407,3 +407,7 @@ No seletor **Ótica**, escolha Natural (padrão), Monocromático, Fósforo verde
 O seletor **Textura** oferece Automática (HD no perfil Ultra), NASA 5,4K (solicita HD em Ultra ou Equilibrado) e Padrão. A opção HD usa a composição global de janeiro de 2004 com topografia e batimetria sombreadas da [NASA Earth Observatory — Blue Marble Next Generation](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/), de 5400 × 2700 pixels. Não é imagem em tempo real nem terreno geométrico detalhado de cidades. O globo começa enquadrado na América do Sul e tem atmosfera mais suave e relevo de iluminação menos exagerado.
 
 O navegador verifica suporte a texturas de pelo menos 5400 pixels, dimensões e carregamento CORS antes de solicitar a imagem ao globo. Em caso de falha, mantém a textura padrão; o perfil Econômico e o modo noturno também usam suas texturas existentes. A imagem vem do domínio oficial da NASA, com atribuição na tela. Não são usados tiles do Google fora de seus componentes oficiais. É necessária conexão para baixar os ativos externos; o uso de memória e a aparência precisam ser verificados em navegador real.
+
+## Identidade OSIRIS e Central de Operações
+
+OSIRIS é a identidade visual da plataforma Sentinel Atlas. O repositório, as APIs e os formatos de dados mantêm compatibilidade com a versão anterior. O cabeçalho do globo oferece **Natural** (sem moldura tática), **Tático** (retículo e grade decorativos, não radar) e **Operações** (página independente em `/operations.html`). A Central consulta `/api/health` e `/api/geoint/layers` mediante clique, apresenta o estado da API e o catálogo de fontes com filtros, natureza dos dados e horário da consulta local. Não verifica disponibilidade externa nem inicia coleta. Nenhum acesso a câmeras, identificação biométrica ou monitoramento de pessoas é implementado. Blueprint e integração com Atlas Intelligence continuam etapas futuras. As texturas, iluminação e controles existentes permanecem preservados. Testar o layout em navegador real.

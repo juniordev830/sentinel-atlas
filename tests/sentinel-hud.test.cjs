@@ -928,3 +928,44 @@ test('textura HD preserva imagem anterior e ignora resposta atrasada no modo not
   assert.equal(calls.at(-1), 'hd.jpg');
   assert.match(credit.textContent, /NASA Earth Observatory/);
 });
+
+
+test('OSIRIS alterna entre modo natural e tático sem acessar fontes externas', () => {
+  const fs=require('node:fs'),path=require('node:path');
+  const code=fs.readFileSync(path.join(__dirname,'../web/osiris.js'),'utf8');
+  const classes=classList();
+  function control(){return {attrs:{},setAttribute(k,v){this.attrs[k]=v;},addEventListener(k,v){this[k]=v;}};}
+  const natural=control(),tactical=control();
+  vm.runInNewContext(code,{document:{body:{classList:classes},getElementById:id=>id==='osiris-natural'?natural:tactical}});
+  assert.equal(natural.attrs['aria-pressed'],'true');
+  tactical.click();
+  assert.equal(classes.contains('osiris-tactical'),true);
+  assert.equal(tactical.attrs['aria-pressed'],'true');
+  natural.click();
+  assert.equal(classes.contains('osiris-tactical'),false);
+  assert.doesNotMatch(code,/fetch\(|WebSocket/);
+});
+
+test('OSIRIS distingue configuração do catálogo de disponibilidade externa', () => {
+  const {normalizeSources,summarizeSources}=require('../web/operations.js');
+  const entries=normalizeSources({layers:[
+    {id:'weather',name:'Tempo',provider:'Open-Meteo',data_kind:'model',status:'ready'},
+    {id:'traffic',name:'Trânsito',status:'requires_configuration'},
+    {id:'other',name:'Outro',status:'online'},
+    null
+  ]});
+  assert.equal(entries[0].nature,'model');
+  assert.equal(entries[2].state,'unknown');
+  assert.deepEqual(summarizeSources(entries),{total:3,pending:1});
+  assert.throws(()=>normalizeSources({layers:null}));
+});
+
+test('central OSIRIS tem navegação e consulta apenas rotas locais', () => {
+  const fs=require('node:fs'),path=require('node:path');
+  const code=fs.readFileSync(path.join(__dirname,'../web/operations.js'),'utf8');
+  assert.match(html,/href="\/operations.html"/);
+  assert.match(html,/body:not\(\.osiris-tactical\) \.tactical-overlay/);
+  assert.match(code,/localJson\('\/api\/health'\)/);
+  assert.match(code,/localJson\('\/api\/geoint\/layers'\)/);
+  assert.doesNotMatch(code,/innerHTML|https?:\/\//);
+});

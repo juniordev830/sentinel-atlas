@@ -928,3 +928,44 @@ test('textura HD preserva imagem anterior e ignora resposta atrasada no modo not
   assert.equal(calls.at(-1), 'hd.jpg');
   assert.match(credit.textContent, /NASA Earth Observatory/);
 });
+
+
+test('cartografia converte longitude/latitude de GeoJSON e rejeita geometrias inválidas', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function cartographyPaths(', 'const cartographyInputs =') +
+    '\nglobalThis.carto = {cartographyPaths,cartographyCities,visibleCartographyCities};', context);
+  const fc = {type:'FeatureCollection',features:[
+    {geometry:{type:'Polygon',coordinates:[[[-35,-5],[-36,-5],[-35,-5]]]}},
+    {geometry:{type:'LineString',coordinates:[[181,0],[0,0]]}},
+    {geometry:{type:'MultiLineString',coordinates:[[[0,0],[1,1]]]}}
+  ]};
+  const paths = context.carto.cartographyPaths(fc,'countries');
+  assert.equal(paths.length,2);
+  assert.equal(paths[0].points[0][0],-5);
+  assert.equal(paths[0].points[0][1],-35);
+  assert.throws(() => context.carto.cartographyPaths({features:[]},'states'));
+});
+
+test('cartografia adapta rótulos de cidades ao zoom e à região visível', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function cartographyPaths(', 'const cartographyInputs =') +
+    '\nglobalThis.carto = {cartographyCities,visibleCartographyCities};', context);
+  const city = (name,lat,lng,rank) => ({geometry:{type:'Point',coordinates:[lng,lat]},properties:{name,scalerank:rank}});
+  const data = context.carto.cartographyCities({type:'FeatureCollection',features:[
+    city('Natal',-5.8,-35.2,5),city('Capital',-15,-47,2),
+    city('Outra região',40,170,1),city('Inválido',91,0,1)
+  ]});
+  assert.equal(data.length,3);
+  const far = context.carto.visibleCartographyCities(data,{altitude:2});
+  assert.equal(far.length,2);
+  const near = context.carto.visibleCartographyCities(data,{altitude:.4,lat:-6,lng:-35});
+  assert.equal(near.length,2);
+  assert.ok(near.some(c=>c.name==='Natal'));
+});
+
+test('cartografia é opcional e usa versão fixa da fonte Natural Earth', () => {
+  assert.match(html, /natural-earth-vector\/v5\.1\.2\/geojson\//);
+  assert.match(html, /id="carto-countries" type="checkbox"/);
+  assert.match(html, /Promise\.allSettled\(selected\.map\(loadCartography\)\)/);
+  assert.match(html, /body\.map-mode \.cartography-control/);
+});

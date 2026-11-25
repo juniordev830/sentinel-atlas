@@ -389,3 +389,7 @@ A API exige `SENTINEL_API_TOKEN` com pelo menos 32 caracteres quando `SENTINEL_E
 Para revisar alterações neste projeto, consulte o [guia técnico de validação](docs/GUIA_DE_VALIDACAO.md), com comandos, cenários de regressão e próximos incrementos.
 
 Quando o provedor externo de rotas de bicicleta estiver indisponível, `GET /api/routes/bicycle` responde HTTP 503 com `code: "Unavailable"` e `routes: []`; coordenadas inválidas respondem HTTP 422. Essa distinção permite que clientes diferenciem erro de entrada de falha externa.
+
+## Filtro temporal do histórico local
+
+A rota protegida `GET /api/positions/history?start=10&end=20&limit=100` aceita limites inclusivos opcionais em segundos Unix UTC (inclusive zero). Retorna registros do mais recente ao mais antigo; o limite continua restrito a 1–1000 registros. Intervalos invertidos, negativos e não finitos retornam HTTP 422. A consulta não altera a retenção nem grava ou exclui dados. Use exclusivamente posições autorizadas e preserve a autenticação.

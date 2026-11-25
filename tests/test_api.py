@@ -367,3 +367,30 @@ def test_bicycle_route_reports_upstream_outage_with_http_503(monkeypatch):
         "code": "Unavailable", "routes": [],
         "error": "Serviço OSRM indisponível",
     }
+
+
+@pytest.mark.parametrize("params", [{"start": 10, "end": 1}, {"start": -1}, {"end": "nan"}, {"start": "inf"}])
+def test_history_rejects_invalid_time_range(params, monkeypatch):
+    monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token=None))
+    assert client.get("/api/positions/history", params=params).status_code == 422
+
+
+def test_history_filters_inclusive_range_and_remains_protected(tmp_path, monkeypatch):
+    from backend.storage import GeofenceStore
+    from python.gps_core import Position
+
+    store = GeofenceStore(tmp_path / "history.sqlite3")
+    for timestamp in (0, 10, 20, 30):
+        store.save_position(Position(0, 0, timestamp))
+    monkeypatch.setattr(app_module, "store", store)
+    monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token="test-history-token"))
+    with TestClient(app) as isolated:
+        assert isolated.get("/api/positions/history").status_code == 401
+        response = isolated.get("/api/positions/history", params={"start": 10, "end": 20},
+                                headers={"Authorization": "Bearer test-history-token"})
+        assert response.status_code == 200
+        assert [item["timestamp"] for item in response.json()] == [20, 10]
+        response = isolated.get("/api/positions/history", params={"start": 10, "limit": 1},
+                                headers={"Authorization": "Bearer test-history-token"})
+        assert [item["timestamp"] for item in response.json()] == [30]
+    assert len(store.list_positions()) == 4

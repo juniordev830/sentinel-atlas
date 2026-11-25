@@ -404,8 +404,17 @@ def delete_geofence(name: str) -> dict[str, object]:
 
 
 @app.get("/api/positions/history")
-def position_history(limit: int = 100) -> list[dict[str, float]]:
-    return [asdict(position) for position in store.list_positions(limit)]
+def position_history(
+    limit: int = 100,
+    start: float | None = Query(default=None, ge=0, allow_inf_nan=False),
+    end: float | None = Query(default=None, ge=0, allow_inf_nan=False),
+) -> list[dict[str, float]]:
+    """Histórico local autorizado, com intervalo temporal inclusivo opcional."""
+    try:
+        positions = store.list_positions(limit, start=start, end=end)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return [asdict(position) for position in positions]
 
 
 @app.get("/api/map/features")

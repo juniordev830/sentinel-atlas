@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import hmac
 import os
 import sys
@@ -362,7 +363,9 @@ def starlink() -> dict[str, object]:
 def aircraft() -> dict[str, object]:
     try:
         payload = fetch_opensky()
-        states = payload.get("states", []) if isinstance(payload, dict) else []
+        if not isinstance(payload, dict) or ("states" in payload and payload["states"] is not None and not isinstance(payload["states"], list)):
+            raise SourceUnavailable("Resposta inválida do OpenSky")
+        states = payload.get("states") or []
         return {"source": "OpenSky", "count": len(states), "items": states[:100]}
     except SourceUnavailable as error:
         return {"source": "OpenSky", "count": 0, "items": [], "error": str(error)}
@@ -408,6 +411,11 @@ def position_history(limit: int = 100) -> list[dict[str, float]]:
     return [asdict(position) for position in store.list_positions(limit)]
 
 
+def valid_map_coordinate(value: Any, bound: int) -> bool:
+    return (type(value) in (int, float) and -bound <= value <= bound
+            and math.isfinite(value))
+
+
 @app.get("/api/map/features")
 def map_features(
     lat: float = Query(ge=-90, le=90),
@@ -447,13 +455,19 @@ def map_features(
             detail="Dados cartográficos temporariamente indisponíveis; tente novamente mais tarde.",
         ) from error
 
+    if not isinstance(payload, dict) or not isinstance(payload.get("elements"), list):
+        raise HTTPException(status_code=503, detail="Resposta cartográfica inválida.")
     items: list[dict[str, Any]] = []
-    for element in payload.get("elements", []):
+    for element in payload["elements"][:100]:
+        if not isinstance(element, dict):
+            continue
         tags = element.get("tags") or {}
         center = element.get("center") or {}
+        if not isinstance(tags, dict) or not isinstance(center, dict):
+            continue
         item_lat = element.get("lat", center.get("lat"))
         item_lng = element.get("lon", center.get("lon"))
-        if item_lat is None or item_lng is None:
+        if not valid_map_coordinate(item_lat, 90) or not valid_map_coordinate(item_lng, 180):
             continue
         if "building" in tags:
             kind = "building"

@@ -793,3 +793,52 @@ test('shader de cidades só ativa sobre o lado noturno e respeita perfil econôm
   assert.match(html, /cityLightsMesh\.material\.uniforms\.sunVector\.value\.copy\(sun\.position\)\.normalize\(\)/);
   assert.doesNotMatch(snippet('function loadCityLights()', '// Nuvens independentes'), /maps\.googleapis\.com/);
 });
+
+
+test('textura HD respeita GPU, perfil e modo noturno', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function chooseEarthTexture(', 'function refreshEarthTexture(') +
+    '\nglobalThis.chooseEarthTexture = chooseEarthTexture;', context);
+  const choose = context.chooseEarthTexture;
+  assert.equal(choose('auto', 'ultra', 8192, false), 'hd');
+  assert.equal(choose('hd', 'balanced', 8192, false), 'hd');
+  assert.equal(choose('auto', 'balanced', 8192, false), 'day');
+  assert.equal(choose('standard', 'ultra', 8192, false), 'day');
+  assert.equal(choose('hd', 'eco', 8192, false), 'day');
+  assert.equal(choose('hd', 'ultra', 4096, false), 'day');
+  assert.equal(choose('hd', 'ultra', 8192, true), 'night');
+  assert.equal(choose('hd', 'ultra', NaN, false), 'day');
+});
+
+test('textura HD preserva imagem anterior e ignora resposta atrasada no modo noturno', () => {
+  const calls = [], images = [], credit = { textContent: '' }, detail = { value: 'hd' };
+  const context = {
+    document: { getElementById: id => id === 'earth-detail' ? detail : credit },
+    globe: { renderer: () => ({ capabilities: { maxTextureSize: 8192 } }), globeImageUrl: url => calls.push(url) },
+    textures: { day: 'standard.jpg', night: 'night.jpg' }, detailedEarthUrl: 'hd.jpg',
+    earthTextureGeneration: 0, earthTextureChoice: null, currentTexture: 'day',
+    Image: class { constructor() { images.push(this); } }
+  };
+  vm.runInNewContext(snippet('function chooseEarthTexture(', 'function getRenderProfile(') +
+    '\nglobalThis.refreshEarthTexture = refreshEarthTexture;', context);
+  context.refreshEarthTexture('ultra');
+  assert.equal(calls.at(-1), 'standard.jpg');
+  assert.equal(images[0].crossOrigin, 'anonymous');
+  context.currentTexture = 'night';
+  context.refreshEarthTexture('ultra');
+  images[0].naturalWidth = 5400;
+  images[0].naturalHeight = 2700;
+  images[0].onload();
+  assert.equal(calls.at(-1), 'night.jpg');
+  context.currentTexture = 'day';
+  context.refreshEarthTexture('ultra');
+  images[1].onerror();
+  assert.equal(calls.at(-1), 'standard.jpg');
+  assert.match(credit.textContent, /indisponível/);
+  context.refreshEarthTexture('ultra');
+  images[2].naturalWidth = 5400;
+  images[2].naturalHeight = 2700;
+  images[2].onload();
+  assert.equal(calls.at(-1), 'hd.jpg');
+  assert.match(credit.textContent, /NASA Earth Observatory/);
+});

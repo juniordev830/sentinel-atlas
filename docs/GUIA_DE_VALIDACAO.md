@@ -22,3 +22,7 @@ O repositório combina serviços Python em `backend/`, módulos geográficos em 
 ## Próxima etapa
 
 Registrar comandos de benchmark, fixtures mínimos e testes E2E com reprodução determinística de fontes. Não promover como sistema de vigilância operacional sem uma avaliação específica de confiabilidade, privacidade e permissões.
+
+## Respostas externas malformadas
+
+Testes simulam OpenSky com `states: null` (lista vazia válida) e tipo inválido (erro no envelope), além de Overpass com envelopes inválidos (HTTP 503) e elementos individuais com coordenadas ou metadados inválidos (ignorados). Não há chamadas externas durante esses testes. Execute `python -m pytest tests/test_api.py -q`. O processamento cartográfico considera até 100 elementos por consulta; não substitui verificação de disponibilidade, cobertura e licenciamento dos provedores.

@@ -796,7 +796,7 @@ test('shader de cidades só ativa sobre o lado noturno e respeita perfil econôm
 
 
 test('interface fosca preserva a renderização do globo e o foco visível', () => {
-  const css = snippet('/* Interface fosca:', '</style>');
+  const css = snippet('/* Interface fosca:', '.annotation-panel {');
   assert.match(css, /backdrop-filter: none/);
   assert.match(css, /--panel: #10171d/);
   assert.match(css, /focus-visible/);
@@ -820,4 +820,111 @@ test('painel de consulta diferencia natureza e horário do dado da consulta', ()
   assert.match(code, /fetchedAt: data.fetched_at/);
   assert.match(code, /source: String\(data.provider/);
   assert.match(code, /dataKind: String/);
+});
+
+test('anotações fecham áreas e preservam os vértices originais', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function annotationSegments(', 'let annotationDraft =') +
+    '\nglobalThis.annotationSegments = annotationSegments;', context);
+  const vertices = [{lat: -5, lng: -35}, {lat: -6, lng: -35}, {lat: -6, lng: -36}];
+  const edges = context.annotationSegments('area', vertices);
+  assert.equal(edges.length, 3);
+  assert.equal(edges[2].endLat, -5);
+  assert.equal(edges[2].endLng, -35);
+  assert.equal(vertices.length, 3);
+  assert.equal(context.annotationSegments('line', vertices).length, 2);
+  assert.equal(context.annotationSegments('pin', vertices.slice(0, 1)).length, 0);
+});
+
+test('anotações rejeitam coordenadas inválidas e formas incompletas', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function annotationSegments(', 'let annotationDraft =') +
+    '\nglobalThis.annotationSegments = annotationSegments;', context);
+  for (const [kind, vertices] of [
+    ['area', [{lat: 0, lng: 0}]], ['line', [{lat: 0, lng: 0}]],
+    ['pin', [{lat: 91, lng: 0}]], ['pin', [{lat: 0, lng: Infinity}]],
+    ['pin', [{lat: 0, lng: 0}, {lat: 1, lng: 1}]], ['invalid', []],
+    ['line', Array.from({length: 101}, () => ({lat: 0, lng: 0}))]
+  ]) assert.throws(() => context.annotationSegments(kind, vertices));
+});
+
+test('anotações não enviam coordenadas ao servidor durante o desenho', () => {
+  const callback = snippet('.onGlobeClick(async ({ lat, lng }) => {', 'const res = await fetch(`/api/location/info');
+  assert.ok(callback.indexOf('annotationDraft.vertices.push') < callback.indexOf('const inspector'));
+  assert.match(callback, /return;/);
+  const renderer = snippet('function renderLocalAnnotations()', "annotationToggle.addEventListener('click'");
+  assert.match(renderer, /item.textContent = shape.name/);
+  assert.doesNotMatch(renderer, /innerHTML|fetch\(/);
+  assert.match(renderer, /replaceAssets\('annotation', points\)/);
+});
+
+test('modos ópticos são explícitos e permitem retornar às cores naturais', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function applyVisualPreset(', 'const visualPreset =') +
+    '\nglobalThis.applyVisualPreset = applyVisualPreset;', context);
+  const target = { dataset: {} }, note = { textContent: '' };
+  for (const value of ['mono', 'phosphor', 'pseudocolor']) {
+    assert.equal(context.applyVisualPreset(value, target, note), value);
+    assert.equal(target.dataset.visualPreset, value);
+    assert.match(note.textContent, /não é sensor/);
+  }
+  assert.equal(context.applyVisualPreset('natural', target, note), 'natural');
+  assert.match(note.textContent, /cores naturais/);
+  assert.equal(context.applyVisualPreset('invalid', target, note), 'natural');
+});
+
+test('os filtros ópticos não alteram os mapas de terceiros', () => {
+  const css = snippet('/* Filtros ilustrativos', '</style>');
+  assert.match(css, /#globe\[data-visual-preset="mono"\]/);
+  assert.match(css, /#globe\[data-visual-preset="phosphor"\]/);
+  assert.match(css, /#globe\[data-visual-preset="pseudocolor"\]/);
+  assert.doesNotMatch(css, /#map\b|#map-3d|#globe\[data-visual-preset="natural"\]/);
+});
+
+test('textura HD respeita GPU, perfil e modo noturno', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function chooseEarthTexture(', 'function refreshEarthTexture(') +
+    '\nglobalThis.chooseEarthTexture = chooseEarthTexture;', context);
+  const choose = context.chooseEarthTexture;
+  assert.equal(choose('auto', 'ultra', 8192, false), 'hd');
+  assert.equal(choose('hd', 'balanced', 8192, false), 'hd');
+  assert.equal(choose('auto', 'balanced', 8192, false), 'day');
+  assert.equal(choose('standard', 'ultra', 8192, false), 'day');
+  assert.equal(choose('hd', 'eco', 8192, false), 'day');
+  assert.equal(choose('hd', 'ultra', 4096, false), 'day');
+  assert.equal(choose('hd', 'ultra', 8192, true), 'night');
+  assert.equal(choose('hd', 'ultra', NaN, false), 'day');
+});
+
+test('textura HD preserva imagem anterior e ignora resposta atrasada no modo noturno', () => {
+  const calls = [], images = [], credit = { textContent: '' }, detail = { value: 'hd' };
+  const context = {
+    document: { getElementById: id => id === 'earth-detail' ? detail : credit },
+    globe: { renderer: () => ({ capabilities: { maxTextureSize: 8192 } }), globeImageUrl: url => calls.push(url) },
+    textures: { day: 'standard.jpg', night: 'night.jpg' }, detailedEarthUrl: 'hd.jpg',
+    earthTextureGeneration: 0, earthTextureChoice: null, currentTexture: 'day',
+    Image: class { constructor() { images.push(this); } }
+  };
+  vm.runInNewContext(snippet('function chooseEarthTexture(', 'function getRenderProfile(') +
+    '\nglobalThis.refreshEarthTexture = refreshEarthTexture;', context);
+  context.refreshEarthTexture('ultra');
+  assert.equal(calls.at(-1), 'standard.jpg');
+  assert.equal(images[0].crossOrigin, 'anonymous');
+  context.currentTexture = 'night';
+  context.refreshEarthTexture('ultra');
+  images[0].naturalWidth = 5400;
+  images[0].naturalHeight = 2700;
+  images[0].onload();
+  assert.equal(calls.at(-1), 'night.jpg');
+  context.currentTexture = 'day';
+  context.refreshEarthTexture('ultra');
+  images[1].onerror();
+  assert.equal(calls.at(-1), 'standard.jpg');
+  assert.match(credit.textContent, /indisponível/);
+  context.refreshEarthTexture('ultra');
+  images[2].naturalWidth = 5400;
+  images[2].naturalHeight = 2700;
+  images[2].onload();
+  assert.equal(calls.at(-1), 'hd.jpg');
+  assert.match(credit.textContent, /NASA Earth Observatory/);
 });

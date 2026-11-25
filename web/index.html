@@ -1037,6 +1037,28 @@
       @media (prefers-reduced-motion: reduce) {
         .hud .panel, .hud button { animation: none; transition: none; }
       }
+      .annotation-panel { position: fixed; top: 86px; left: 20px; width: min(340px, calc(100vw - 40px)); max-height: 50dvh; overflow: auto; z-index: 20; pointer-events: auto; background: #10171d; border-color: #29343e; box-shadow: 0 4px 14px #0004; backdrop-filter: none; }
+      .annotation-panel[hidden], body.focus-mode .annotation-panel, body.map-mode .annotation-panel { display: none; }
+      .annotation-panel header, .annotation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
+      .annotation-panel label { display: block; margin: 8px 0; }
+      .annotation-panel input, .annotation-panel select { max-width: 100%; width: 100%; border-radius: 8px; }
+      .annotation-panel p, .annotation-panel li { color: #c1cbd4; font-size: 12px; line-height: 1.5; }
+      .annotation-panel ol { padding-left: 18px; }
+      .annotation-panel li button { margin-left: 8px; }
+      /* Filtros ilustrativos somente no globo independente, nunca nos mapas Google. */
+      #globe[data-visual-preset="mono"] { filter: grayscale(1) contrast(1.08); }
+      #globe[data-visual-preset="phosphor"] { filter: grayscale(1) sepia(1) hue-rotate(75deg) saturate(1.5) contrast(1.12); }
+      #globe[data-visual-preset="pseudocolor"] { filter: hue-rotate(145deg) saturate(1.35) contrast(1.12); }
+      .visual-preset-control { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; color: #b6c5d0; font-size: 11px; }
+      #visual-preset { min-height: 36px; max-width: 100%; background: #151e25; border-color: #34424e; }
+      #visual-preset-note { color: #fcd38b; font-size: 10px; max-width: 180px; }
+      /* Atribuição da imagem base; não sobrepõe controles nem mapas Google. */
+      .earth-image-credit { position: fixed; left: 20px; bottom: 12px; z-index: 8;
+        color: #cbd5e1; font: 11px Inter, system-ui, sans-serif; pointer-events: none;
+        background: #10171de6; padding: 5px 9px; border-radius: 5px; }
+      body.map-mode .earth-image-credit { display: none; }
+      @media (max-width: 900px) { .earth-image-credit { left: 10px; bottom: 5px; font-size: 10px; } }
+      #earth-detail { min-height: 36px; background: #151e25; color: #e2e8f0; border: 1px solid #34424e; border-radius: 7px; padding: 5px 8px; }
     </style>
   </head>
   <body>
@@ -1073,6 +1095,19 @@
         </div>
       </div>
 
+      <section id="annotation-panel" class="panel annotation-panel" hidden aria-label="Anotações locais">
+        <header><strong>Modo diretor · Anotações</strong><button id="annotation-close" type="button" aria-label="Fechar anotações">✕</button></header>
+        <p>Desenhe no globo. As anotações ficam apenas nesta sessão, sem envio ao servidor.</p>
+        <label>Forma <select id="annotation-kind"><option value="pin">Pino</option><option value="line">Linha</option><option value="area">Área (contorno)</option></select></label>
+        <label>Nome <input id="annotation-name" maxlength="80" placeholder="Nome da anotação" /></label>
+        <div class="annotation-actions">
+          <button id="annotation-start" type="button">Começar</button>
+          <button id="annotation-finish" type="button" disabled>Concluir</button>
+          <button id="annotation-cancel" type="button" disabled>Cancelar</button>
+        </div>
+        <p id="annotation-status" role="status" aria-live="polite">Selecione uma forma para começar.</p>
+        <ol id="annotation-list" aria-label="Anotações criadas"></ol>
+      </section>
       <section id="geoint-panel" class="panel geoint-sources-panel" hidden aria-label="Catálogo de fontes geoespaciais">
         <div class="geoint-panel-header">
           <strong>🌍 Fontes GeoINT · 16 categorias</strong>
@@ -1216,6 +1251,22 @@
           <button id="replay-history">⏱️ Histórico</button>
           <button id="demo-geofence" type="button">Simular geofence</button>
           <button id="texture-toggle">🌙 Luz noturna</button>
+          <label class="visual-preset-control" for="visual-preset">Ótica
+            <select id="visual-preset" aria-describedby="visual-preset-note">
+              <option value="natural">Natural</option>
+              <option value="mono">Monocromático</option>
+              <option value="phosphor">Fósforo verde · simulado</option>
+              <option value="pseudocolor">Pseudocor · simulado</option>
+            </select>
+          </label>
+          <span id="visual-preset-note" role="status" aria-live="polite">Globo independente · cores naturais</span>
+          <label class="render-quality-control" for="earth-detail">Textura
+            <select id="earth-detail" title="Imagem histórica de satélite, não observação ao vivo">
+              <option value="auto">Automática</option>
+              <option value="hd">NASA · 5,4K</option>
+              <option value="standard">Padrão</option>
+            </select>
+          </label>
           <label class="render-quality-control" for="render-quality">Detalhes
             <select id="render-quality" title="Qualidade de renderização do globo">
               <option value="auto">Automático</option>
@@ -1240,6 +1291,7 @@
           <button id="google-3d-view" type="button" aria-pressed="false" title="Visão fotorrealista oficial do Google Maps; pode gerar custos de API">🏙️ Google 3D</button>
           <button id="weather-toggle" type="button" aria-expanded="false" aria-controls="weather-panel">☁ Meteorologia</button>
           <span id="solar-status" class="solar-caption" title="Posição solar estimada pelo horário UTC">☀ Sol UTC · estimado</span>
+          <button id="annotation-toggle" type="button" aria-expanded="false" aria-controls="annotation-panel">✎ Desenhar</button>
           <button id="toggle-geoint" type="button" aria-expanded="false" aria-controls="geoint-panel">🌐 Fontes GeoINT</button>
           <button id="toggle-ai" style="border-color:var(--cyan);color:var(--cyan);background:rgba(56,189,248,0.15);">🤖 Copiloto IA</button>
             </div>
@@ -1255,6 +1307,7 @@
         </div>
       </div>
     </div>
+    <div id="earth-image-credit" class="earth-image-credit" role="status" aria-live="polite">Terra · Blue Marble · imagem histórica</div>
     <div id="map" aria-label="Mapa Google com imagens de satélite e trânsito"></div>
     <div id="map-3d" aria-label="Mapa Google 3D fotorrealista"></div>
     <div id="google3d-toolbar" role="group" aria-label="Navegação no Google 3D">
@@ -1375,7 +1428,10 @@
         night: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-night.jpg',
         day: 'https://unpkg.com/three-globe@2.43.0/example/img/earth-blue-marble.jpg',
       };
+      const detailedEarthUrl = 'https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/january/world.topo.bathy.200401.3x5400x2700.jpg';
       let currentTexture = 'day';
+      let earthTextureGeneration = 0;
+      let earthTextureChoice = null;
       let replayTimer;
       let positionSocket;
 
@@ -1451,12 +1507,32 @@
         })[character]);
       }
 
+      // Anotações locais independentes das fontes externas e do GPS.
+      function annotationSegments(kind, vertices) {
+        if (!['pin', 'line', 'area'].includes(kind)) throw new Error('Forma inválida');
+        const minimum = {pin: 1, line: 2, area: 3}[kind];
+        if (!Array.isArray(vertices) || vertices.length < minimum || vertices.length > 100 ||
+            (kind === 'pin' && vertices.length !== 1) ||
+            vertices.some(p => !p || !Number.isFinite(p.lat) || !Number.isFinite(p.lng) ||
+              Math.abs(p.lat) > 90 || Math.abs(p.lng) > 180)) {
+          throw new Error('Quantidade ou coordenadas de vértices inválidas');
+        }
+        const sequence = kind === 'area' ? [...vertices, vertices[0]] : vertices;
+        return sequence.slice(1).map((p, i) => ({
+          startLat: sequence[i].lat, startLng: sequence[i].lng,
+          endLat: p.lat, endLng: p.lng, color: '#a5b4fc'
+        }));
+      }
+
+      let annotationDraft = null;
+      let annotationSequence = 0;
+      const localAnnotations = [];
       const globe = Globe()(document.getElementById('globe'))
         .globeImageUrl(textures[currentTexture])
         .bumpImageUrl('https://unpkg.com/three-globe@2.43.0/example/img/earth-topology.png')
         .backgroundImageUrl('https://unpkg.com/three-globe@2.43.0/example/img/night-sky.png')
         .showAtmosphere(true)
-        .atmosphereColor('#38bdf8')
+        .atmosphereColor('#78b8f5')
         .atmosphereAltitude(0.18)
         .pointLat('lat').pointLng('lng').pointAltitude('altitude').pointColor('color').pointRadius(0.5)
         .pointLabel(d => `<div style="background:rgba(15,23,42,0.92);padding:6px 10px;border-radius:8px;border:1px solid rgba(56,189,248,0.35);font-family:sans-serif;font-size:12px;box-shadow:0 8px 16px rgba(0,0,0,0.5);"><b>${escapeHtml(d.label)}</b><br><span style="color:#94a3b8;font-size:10px;">${escapeHtml(d.type === 'earthquake' ? 'USGS · Fonte Pública' : String(d.type).toUpperCase() + ' · Ativo Tático')}</span></div>`)
@@ -1466,6 +1542,15 @@
           inspector.hidden = false;
         })
         .onGlobeClick(async ({ lat, lng }) => {
+          if (annotationDraft && !document.body.classList.contains('focus-mode') && !document.body.classList.contains('map-mode')) {
+            if (annotationDraft.vertices.length >= 100 || (annotationDraft.kind === 'pin' && annotationDraft.vertices.length)) {
+              document.getElementById('annotation-status').textContent = 'Limite de vértices atingido. Conclua ou cancele.';
+              return;
+            }
+            annotationDraft.vertices.push({lat, lng});
+            document.getElementById('annotation-status').textContent = annotationDraft.vertices.length + ' vértice(s). Conclua quando terminar.';
+            return;
+          }
           const inspector = document.getElementById('inspector');
           inspector.hidden = false;
           inspector.innerHTML = `<strong>🌐 Pesquisando Região...</strong><small>LAT: ${lat.toFixed(4)}° | LNG: ${lng.toFixed(4)}°<br>Consultando inteligência demográfica e empresarial...</small>`;
@@ -1539,6 +1624,74 @@
         .ringLat('lat').ringLng('lng').ringColor('color').ringMaxRadius('maxRadius')
         .ringPropagationSpeed('propagationSpeed').ringRepeatPeriod('repeatPeriod')
         .pointsData(getFilteredPoints('all'));
+      // Enquadramento inicial da América do Sul, sem acessar localização pessoal.
+      globe.pointOfView({ lat: -12, lng: -45, altitude: 2.15 }, 0);
+
+      const annotationPanel = document.getElementById('annotation-panel');
+      const annotationToggle = document.getElementById('annotation-toggle');
+      const annotationStatus = document.getElementById('annotation-status');
+      const annotationFinish = document.getElementById('annotation-finish');
+      const annotationCancel = document.getElementById('annotation-cancel');
+      function resetAnnotationDraft() {
+        annotationDraft = null;
+        annotationFinish.disabled = true;
+        annotationCancel.disabled = true;
+      }
+      function showAnnotations(enabled) {
+        annotationPanel.hidden = !enabled;
+        annotationToggle.setAttribute('aria-expanded', String(enabled));
+        if (!enabled) resetAnnotationDraft();
+      }
+      function renderLocalAnnotations() {
+        const points = localAnnotations.flatMap(shape => shape.vertices.map((vertex, i) => ({
+          id: 'annotation-' + shape.id + '-' + i, type: 'annotation',
+          lat: vertex.lat, lng: vertex.lng, altitude: .025, color: '#a5b4fc',
+          label: shape.name + ' · Anotação local'
+        })));
+        replaceAssets('annotation', points);
+        globe.arcsData([...pathTrails, ...localAnnotations.flatMap(shape => annotationSegments(shape.kind, shape.vertices))]);
+        const list = document.getElementById('annotation-list');
+        list.replaceChildren();
+        for (const shape of localAnnotations) {
+          const item = document.createElement('li');
+          item.textContent = shape.name + ' · ' + shape.vertices.length + ' vértice(s)';
+          const remove = document.createElement('button');
+          remove.type = 'button'; remove.textContent = 'Remover';
+          remove.setAttribute('aria-label', 'Remover ' + shape.name);
+          remove.addEventListener('click', () => {
+            const index = localAnnotations.indexOf(shape);
+            if (index >= 0) localAnnotations.splice(index, 1);
+            renderLocalAnnotations();
+          });
+          item.append(remove); list.append(item);
+        }
+      }
+      annotationToggle.addEventListener('click', () => {
+        if (document.body.classList.contains('map-mode')) setMapView(false);
+        showAnnotations(annotationPanel.hidden);
+      });
+      document.getElementById('annotation-close').addEventListener('click', () => showAnnotations(false));
+      document.getElementById('annotation-start').addEventListener('click', () => {
+        if (localAnnotations.length >= 30) {
+          annotationStatus.textContent = 'Limite de 30 anotações. Remova uma para continuar.';
+          return;
+        }
+        annotationDraft = {kind: document.getElementById('annotation-kind').value, vertices: []};
+        annotationFinish.disabled = false; annotationCancel.disabled = false;
+        annotationStatus.textContent = 'Clique no globo para adicionar vértices.';
+      });
+      annotationCancel.addEventListener('click', () => {
+        resetAnnotationDraft(); annotationStatus.textContent = 'Desenho cancelado.';
+      });
+      annotationFinish.addEventListener('click', () => {
+        if (!annotationDraft) return;
+        try { annotationSegments(annotationDraft.kind, annotationDraft.vertices); }
+        catch (error) { annotationStatus.textContent = error.message; return; }
+        const name = document.getElementById('annotation-name').value.trim().slice(0, 80) || 'Anotação ' + (annotationSequence + 1);
+        localAnnotations.push({...annotationDraft, name, id: ++annotationSequence});
+        resetAnnotationDraft(); renderLocalAnnotations();
+        annotationStatus.textContent = 'Anotação concluída nesta sessão.';
+      });
 
       // Iluminação solar dinâmica, aproximada com base na data/hora UTC.
       const globeMaterial = globe.globeMaterial();
@@ -1687,11 +1840,52 @@
       const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
       const renderQualityControl = document.getElementById('render-quality');
 
+      function chooseEarthTexture(preference, mode, maxTextureSize, isNight) {
+        if (isNight) return 'night';
+        if (maxTextureSize < 5400 || !Number.isFinite(maxTextureSize) || mode === 'eco') return 'day';
+        return preference === 'hd' || (preference === 'auto' && mode === 'ultra') ? 'hd' : 'day';
+      }
+
+      function refreshEarthTexture(mode) {
+        const detail = document.getElementById('earth-detail');
+        const credit = document.getElementById('earth-image-credit');
+        const maxSize = globe.renderer?.()?.capabilities?.maxTextureSize ?? 0;
+        const choice = chooseEarthTexture(detail.value, mode, maxSize, currentTexture === 'night');
+        if (choice === earthTextureChoice) return;
+        earthTextureChoice = choice;
+        const generation = ++earthTextureGeneration;
+        if (choice !== 'hd') {
+          globe.globeImageUrl(textures[choice]);
+          credit.textContent = choice === 'night' ? 'Terra · luzes noturnas históricas' :
+            detail.value === 'hd' ? 'Blue Marble padrão · HD indisponível neste perfil' :
+            'Terra · Blue Marble · imagem histórica';
+          return;
+        }
+        // Preserva a textura padrão durante a verificação CORS e de dimensões.
+        globe.globeImageUrl(textures.day);
+        credit.textContent = 'Blue Marble padrão · carregando NASA 5,4K…';
+        const image = new Image();
+        image.crossOrigin = 'anonymous';
+        const fail = () => {
+          if (generation !== earthTextureGeneration) return;
+          earthTextureChoice = 'day';
+          credit.textContent = 'Blue Marble padrão · NASA HD indisponível';
+        };
+        image.onload = () => {
+          if (generation !== earthTextureGeneration) return;
+          if (image.naturalWidth !== 5400 || image.naturalHeight !== 2700) { fail(); return; }
+          globe.globeImageUrl(detailedEarthUrl);
+          credit.textContent = 'NASA Earth Observatory · Blue Marble NG · jan/2004 · 5,4K';
+        };
+        image.onerror = fail;
+        image.src = detailedEarthUrl;
+      }
+
       function getRenderProfile(requested, devicePixelRatio = 1, compact = false, reducedMotion = false, memoryGb = 4, cpuCores = 4) {
         const modes = {
-          ultra: { dpr: 2, curvature: 1.5, points: 18, arcSegments: 96, arcRadial: 10, atmosphere: .15, bump: 1.2, clouds: true, opacity: .26 },
-          balanced: { dpr: 1.5, curvature: 3, points: 12, arcSegments: 64, arcRadial: 6, atmosphere: .13, bump: .85, clouds: true, opacity: .20 },
-          eco: { dpr: 1, curvature: 6, points: 6, arcSegments: 30, arcRadial: 4, atmosphere: .10, bump: .35, clouds: false, opacity: 0 }
+          ultra: { dpr: 2, curvature: 1.5, points: 18, arcSegments: 96, arcRadial: 10, atmosphere: .11, bump: .7, clouds: true, opacity: .26 },
+          balanced: { dpr: 1.5, curvature: 3, points: 12, arcSegments: 64, arcRadial: 6, atmosphere: .10, bump: .6, clouds: true, opacity: .20 },
+          eco: { dpr: 1, curvature: 6, points: 6, arcSegments: 30, arcRadial: 4, atmosphere: .08, bump: .35, clouds: false, opacity: 0 }
         };
         const powerfulDesktop = !compact && !reducedMotion &&
           Number(memoryGb) >= 8 && Number(cpuCores) >= 8;
@@ -1733,11 +1927,16 @@
           cloudsMesh.visible = profile.clouds;
           cloudsMesh.material.opacity = profile.opacity;
         }
+        refreshEarthTexture(profile.mode);
         renderQualityControl.dataset.resolved = profile.mode;
         renderQualityControl.title = 'Qualidade ativa: ' + profile.mode +
           ' · resolução ' + profile.pixelRatio.toFixed(2) + '×';
       }
       renderQualityControl.addEventListener('change', applyRenderQuality);
+      document.getElementById('earth-detail').addEventListener('change', () => {
+        earthTextureChoice = null;
+        refreshEarthTexture(renderQualityControl.dataset.resolved);
+      });
       motionPreference.addEventListener?.('change', () => {
         if (renderQualityControl.value === 'auto') applyRenderQuality();
       });
@@ -1745,6 +1944,21 @@
         if (renderQualityControl.value === 'auto') applyRenderQuality();
       });
       applyRenderQuality();
+
+      function applyVisualPreset(value, target, note) {
+        const allowed = ['natural', 'mono', 'phosphor', 'pseudocolor'];
+        const selected = allowed.includes(value) ? value : 'natural';
+        target.dataset.visualPreset = selected;
+        note.textContent = selected === 'natural'
+          ? 'Globo independente · cores naturais'
+          : 'Filtro ilustrativo · não é sensor, infravermelho ou medição térmica';
+        return selected;
+      }
+      const visualPreset = document.getElementById('visual-preset');
+      const visualPresetNote = document.getElementById('visual-preset-note');
+      visualPreset.addEventListener('change', () => {
+        visualPreset.value = applyVisualPreset(visualPreset.value, document.getElementById('globe'), visualPresetNote);
+      });
 
       const rotationToggle = document.getElementById('rotation-toggle');
       let rotationRequested = !motionPreference.matches;
@@ -1877,7 +2091,7 @@
 
       document.getElementById('texture-toggle').addEventListener('click', event => {
         currentTexture = currentTexture === 'night' ? 'day' : 'night';
-        globe.globeImageUrl(textures[currentTexture]);
+        refreshEarthTexture(renderQualityControl.dataset.resolved);
         if (cityLightsMesh) cityLightsMesh.visible =
           currentTexture === 'day' && renderQualityControl.dataset.resolved !== 'eco';
         event.currentTarget.textContent = currentTexture === 'night' ? '☀️ Luz do dia' : '🌙 Luz noturna';

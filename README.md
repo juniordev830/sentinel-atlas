@@ -393,3 +393,17 @@ Quando o provedor externo de rotas de bicicleta estiver indisponível, `GET /api
 ## Filtro temporal do histórico local
 
 A rota protegida `GET /api/positions/history?start=10&end=20&limit=100` aceita limites inclusivos opcionais em segundos Unix UTC (inclusive zero). Retorna registros do mais recente ao mais antigo; o limite continua restrito a 1–1000 registros. Intervalos invertidos, negativos e não finitos retornam HTTP 422. A consulta não altera a retenção nem grava ou exclui dados. Use exclusivamente posições autorizadas e preserve a autenticação.
+
+## Modo diretor: anotações no globo
+
+Abra **Desenhar**, escolha Pino, Linha ou Área (contorno), informe um nome e clique em Começar. Clique nos pontos desejados do globo 3D e depois em Concluir (mínimo de 1, 2 ou 3 vértices, respectivamente). Use Cancelar para descartar o rascunho ou Remover para excluir uma anotação concluída. As linhas são arcos visuais, não rotas viárias nem limites oficiais; o contorno não é uma medição de área. As anotações são locais à sessão, sem persistência após recarregar, e não enviam coordenadas ao backend durante a criação. Limites: 30 anotações e 100 vértices por forma. O painel não opera no mapa Google. Os testes de geometria e isolamento são executados por `node --test tests/sentinel-hud.test.cjs`; validar também a interação em navegador com WebGL.
+
+## Modos ópticos do globo
+
+No seletor **Ótica**, escolha Natural (padrão), Monocromático, Fósforo verde ou Pseudocor. Os três últimos são filtros de cor ilustrativos sobre a renderização do globo, inclusive os marcadores: não representam câmera de visão noturna, sensor infravermelho, calor ou dados meteorológicos. Volte a Natural para interpretar as cores originais das camadas. Os filtros não modificam texturas de origem, shaders, resolução ou mapas Google. A preferência é local à sessão. O custo gráfico do filtro depende do navegador/GPU e precisa ser medido em ambiente real.
+
+## Globo em alta definição — NASA Blue Marble
+
+O seletor **Textura** oferece Automática (HD no perfil Ultra), NASA 5,4K (solicita HD em Ultra ou Equilibrado) e Padrão. A opção HD usa a composição global de janeiro de 2004 com topografia e batimetria sombreadas da [NASA Earth Observatory — Blue Marble Next Generation](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/), de 5400 × 2700 pixels. Não é imagem em tempo real nem terreno geométrico detalhado de cidades. O globo começa enquadrado na América do Sul e tem atmosfera mais suave e relevo de iluminação menos exagerado.
+
+O navegador verifica suporte a texturas de pelo menos 5400 pixels, dimensões e carregamento CORS antes de solicitar a imagem ao globo. Em caso de falha, mantém a textura padrão; o perfil Econômico e o modo noturno também usam suas texturas existentes. A imagem vem do domínio oficial da NASA, com atribuição na tela. Não são usados tiles do Google fora de seus componentes oficiais. É necessária conexão para baixar os ativos externos; o uso de memória e a aparência precisam ser verificados em navegador real.

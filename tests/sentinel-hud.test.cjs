@@ -793,3 +793,27 @@ test('shader de cidades só ativa sobre o lado noturno e respeita perfil econôm
   assert.match(html, /cityLightsMesh\.material\.uniforms\.sunVector\.value\.copy\(sun\.position\)\.normalize\(\)/);
   assert.doesNotMatch(snippet('function loadCityLights()', '// Nuvens independentes'), /maps\.googleapis\.com/);
 });
+
+
+test('modos ópticos são explícitos e permitem retornar às cores naturais', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function applyVisualPreset(', 'const visualPreset =') +
+    '\nglobalThis.applyVisualPreset = applyVisualPreset;', context);
+  const target = { dataset: {} }, note = { textContent: '' };
+  for (const value of ['mono', 'phosphor', 'pseudocolor']) {
+    assert.equal(context.applyVisualPreset(value, target, note), value);
+    assert.equal(target.dataset.visualPreset, value);
+    assert.match(note.textContent, /não é sensor/);
+  }
+  assert.equal(context.applyVisualPreset('natural', target, note), 'natural');
+  assert.match(note.textContent, /cores naturais/);
+  assert.equal(context.applyVisualPreset('invalid', target, note), 'natural');
+});
+
+test('os filtros ópticos não alteram os mapas de terceiros', () => {
+  const css = snippet('/* Filtros ilustrativos', '</style>');
+  assert.match(css, /#globe\[data-visual-preset="mono"\]/);
+  assert.match(css, /#globe\[data-visual-preset="phosphor"\]/);
+  assert.match(css, /#globe\[data-visual-preset="pseudocolor"\]/);
+  assert.doesNotMatch(css, /#map\b|#map-3d|#globe\[data-visual-preset="natural"\]/);
+});

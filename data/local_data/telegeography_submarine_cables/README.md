@@ -18,7 +18,7 @@ MIT license that covers God's Eye View's source code.**
   CC BY-NC-SA 3.0.
 
 The richer structured dataset is licensed separately/commercially by
-TeleGeography. See [`DATA_SOURCES.md`](../../../../DATA_SOURCES.md) for the
+TeleGeography. See [`DATA_SOURCES.md`](../../../DATA_SOURCES.md) for the
 project-wide data-licensing summary.
 
 ## Files

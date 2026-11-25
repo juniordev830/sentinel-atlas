@@ -1059,6 +1059,11 @@
       body.map-mode .earth-image-credit { display: none; }
       @media (max-width: 900px) { .earth-image-credit { left: 10px; bottom: 5px; font-size: 10px; } }
       #earth-detail { min-height: 36px; background: #151e25; color: #e2e8f0; border: 1px solid #34424e; border-radius: 7px; padding: 5px 8px; }
+      .cartography-control { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; color: #cbd5e1; }
+      .cartography-control label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+      .cartography-control input { width: auto; accent-color: #88b8d8; }
+      #cartography-status { font-size: 10px; color: #aebdc9; max-width: 240px; }
+      body.map-mode .cartography-control { display: none; }
     </style>
   </head>
   <body>
@@ -1250,6 +1255,12 @@
           <button id="my-location">📍 Minha localização</button>
           <button id="replay-history">⏱️ Histórico</button>
           <button id="demo-geofence" type="button">Simular geofence</button>
+          <div class="cartography-control" role="group" aria-label="Cartografia Natural Earth">
+            <label><input id="carto-countries" type="checkbox" /> Países</label>
+            <label><input id="carto-states" type="checkbox" /> Estados</label>
+            <label><input id="carto-cities" type="checkbox" /> Cidades</label>
+            <span id="cartography-status" role="status" aria-live="polite">Natural Earth · camadas opcionais</span>
+          </div>
           <button id="texture-toggle">🌙 Luz noturna</button>
           <label class="visual-preset-control" for="visual-preset">Ótica
             <select id="visual-preset" aria-describedby="visual-preset-note">
@@ -1692,6 +1703,99 @@
         resetAnnotationDraft(); renderLocalAnnotations();
         annotationStatus.textContent = 'Anotação concluída nesta sessão.';
       });
+
+      // Natural Earth: cartografia generalizada, não limites legais nem dados ao vivo.
+      const cartographySources = Object.freeze({
+        countries: 'ne_110m_admin_0_countries.geojson',
+        states: 'ne_50m_admin_1_states_provinces_lines.geojson',
+        cities: 'ne_110m_populated_places_simple.geojson'
+      });
+      function cartographyPaths(payload, kind) {
+        const result = [];
+        if (payload?.type !== 'FeatureCollection' || !Array.isArray(payload.features)) throw new Error('GeoJSON inválido');
+        const append = line => {
+          if (result.length >= 2500 || !Array.isArray(line) || line.length < 2 || line.length > 10000) return;
+          if (!line.every(p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]) &&
+              Math.abs(p[0]) <= 180 && Math.abs(p[1]) <= 90)) return;
+          result.push({kind, points: line.map(p => [p[1],p[0]])});
+        };
+        for (const feature of payload.features.slice(0, 2000)) {
+          const g = feature?.geometry;
+          if (!g || !Array.isArray(g.coordinates)) continue;
+          if (g.type === 'LineString') append(g.coordinates);
+          if (g.type === 'MultiLineString' || g.type === 'Polygon') g.coordinates.forEach(append);
+          if (g.type === 'MultiPolygon') g.coordinates.forEach(p => { if (Array.isArray(p)) p.forEach(append); });
+        }
+        return result;
+      }
+      function cartographyCities(payload) {
+        if (payload?.type !== 'FeatureCollection' || !Array.isArray(payload.features)) throw new Error('GeoJSON inválido');
+        return payload.features.slice(0, 3000).flatMap(f => {
+          const g = f?.geometry, p = f?.properties || {};
+          if (g?.type !== 'Point' || !Array.isArray(g.coordinates)) return [];
+          const [lng,lat] = g.coordinates;
+          const name = p.name || p.NAME;
+          if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat)>90 || Math.abs(lng)>180 || typeof name !== 'string' || !name.trim()) return [];
+          const rank = Number(p.scalerank ?? p.SCALERANK ?? 9);
+          return [{lat,lng,name:name.slice(0,80),rank:Number.isFinite(rank)?rank:9}];
+        }).sort((a,b) => a.rank-b.rank);
+      }
+      function visibleCartographyCities(cities, camera) {
+        const near = Number(camera?.altitude) < .8;
+        if (!near) return cities.filter(c => c.rank <= 3).slice(0, 70);
+        const lat = Number(camera?.lat), lng = Number(camera?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+        return cities.filter(c => Math.abs(c.lat-lat) < 24 &&
+          Math.abs(((c.lng-lng+540)%360)-180) < 35).slice(0, 120);
+      }
+      const cartographyInputs = Object.fromEntries(Object.keys(cartographySources).map(key => [key, document.getElementById('carto-'+key)]));
+      const cartographyStatus = document.getElementById('cartography-status');
+      const cartographyCache = new Map();
+      let cartographySequence = 0;
+      let cityRefreshTimer;
+      async function loadCartography(key) {
+        if (cartographyCache.has(key)) return cartographyCache.get(key);
+        const response = await fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/'+cartographySources[key], {signal: AbortSignal.timeout(15000)});
+        if (!response.ok) throw new Error('Fonte indisponível');
+        const raw = await response.text();
+        if (raw.length > 2500000) throw new Error('Limite de dados');
+        const payload = JSON.parse(raw);
+        const data = key === 'cities' ? cartographyCities(payload) : cartographyPaths(payload,key);
+        cartographyCache.set(key,data);
+        return data;
+      }
+      function renderCartography() {
+        const lines = ['countries','states'].flatMap(key => cartographyInputs[key].checked ? cartographyCache.get(key) || [] : []);
+        globe.pathsData(lines);
+        globe.labelsData(cartographyInputs.cities.checked ? visibleCartographyCities(cartographyCache.get('cities') || [],globe.pointOfView()) : []);
+      }
+      async function refreshCartography() {
+        const sequence = ++cartographySequence;
+        const selected = Object.keys(cartographyInputs).filter(key => cartographyInputs[key].checked);
+        cartographyStatus.textContent = 'Natural Earth · carregando…';
+        const results = await Promise.allSettled(selected.map(loadCartography));
+        if (sequence !== cartographySequence) return;
+        const failed = selected.filter((key,i) => results[i].status === 'rejected');
+        failed.forEach(key => { cartographyInputs[key].checked = false; });
+        renderCartography();
+        cartographyStatus.textContent = failed.length ? 'Natural Earth · camada indisponível; tente novamente' :
+          'Natural Earth · escala generalizada · limites de facto';
+      }
+      if (['pathsData','pathPoints','pathPointAlt','pathColor','pathTransitionDuration','labelsData','labelLat','labelLng','labelText','labelSize','labelColor','labelDotRadius','labelAltitude'].every(key => typeof globe[key] === 'function')) {
+        globe.pathPoints('points').pathPointAlt(.012).pathColor(d => d.kind === 'states' ? 'rgba(168,187,201,.50)' : 'rgba(225,234,240,.75)').pathTransitionDuration(0);
+        globe.labelLat('lat').labelLng('lng').labelText('name').labelSize(.55).labelColor(() => '#e2e8f0').labelDotRadius(.12).labelAltitude(.014);
+        Object.values(cartographyInputs).forEach(input => input.addEventListener('change', refreshCartography));
+        globe.controls().addEventListener?.('change', () => {
+          if (!cartographyInputs.cities.checked || !cartographyCache.has('cities') || cityRefreshTimer) return;
+          cityRefreshTimer = setTimeout(() => {
+            cityRefreshTimer = null;
+            if (cartographyInputs.cities.checked) globe.labelsData(visibleCartographyCities(cartographyCache.get('cities'),globe.pointOfView()));
+          }, 350);
+        });
+      } else {
+        Object.values(cartographyInputs).forEach(input => { input.disabled = true; });
+        cartographyStatus.textContent = 'Cartografia indisponível neste renderizador';
+      }
 
       // Iluminação solar dinâmica, aproximada com base na data/hora UTC.
       const globeMaterial = globe.globeMaterial();

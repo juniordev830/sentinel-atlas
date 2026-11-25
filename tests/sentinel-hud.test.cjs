@@ -928,3 +928,33 @@ test('textura HD preserva imagem anterior e ignora resposta atrasada no modo not
   assert.equal(calls.at(-1), 'hd.jpg');
   assert.match(credit.textContent, /NASA Earth Observatory/);
 });
+
+
+test('monitor FPS estima quadros somente após janela mínima', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function estimateFrameRate(', 'const fpsToggle =') +
+    '\nglobalThis.perf = {estimateFrameRate,cloudRotationDelta};', context);
+  assert.equal(context.perf.estimateFrameRate(60,1000),60);
+  assert.equal(context.perf.estimateFrameRate(120,2000),60);
+  assert.equal(context.perf.estimateFrameRate(15,500),null);
+  assert.equal(context.perf.estimateFrameRate(-1,1000),null);
+  assert.equal(context.perf.estimateFrameRate(Infinity,1000),null);
+});
+
+test('animação de nuvens usa tempo decorrido e limita saltos', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function estimateFrameRate(', 'const fpsToggle =') +
+    '\nglobalThis.delta = cloudRotationDelta;', context);
+  const delta = context.delta;
+  assert.ok(Math.abs(60*delta(1000/60)-30*delta(1000/30)) < 1e-9);
+  assert.equal(delta(10000),delta(100));
+  assert.equal(delta(-1),0);
+  assert.equal(delta(NaN),0);
+});
+
+test('monitor FPS é opcional, pausa fora do globo e respeita movimento reduzido', () => {
+  assert.match(html, /id="fps-toggle"[^>]+aria-pressed="false"/);
+  assert.match(html, /if \(fpsFrame !== null\) cancelAnimationFrame\(fpsFrame\)/);
+  assert.match(html, /cloudsMesh\?\.visible && rotationRequested && !motionPreference\.matches/);
+  assert.match(html, /cloudsMesh\.rotation\.y \+= cloudRotationDelta\(elapsed\)/);
+});

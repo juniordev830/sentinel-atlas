@@ -1250,6 +1250,7 @@
           <button id="my-location">📍 Minha localização</button>
           <button id="replay-history">⏱️ Histórico</button>
           <button id="demo-geofence" type="button">Simular geofence</button>
+          <button id="model-toggle" type="button" aria-pressed="true" title="Modelos ilustrativos, não representam escala ou direção física">Modelos 3D: ligados</button>
           <button id="texture-toggle">🌙 Luz noturna</button>
           <label class="visual-preset-control" for="visual-preset">Ótica
             <select id="visual-preset" aria-describedby="visual-preset-note">
@@ -1463,7 +1464,7 @@
         if (document.getElementById('asset-search')?.value.trim()) {
           applyAssetSearch();
         } else {
-          globe.pointsData(getFilteredPoints(activeFilter));
+          renderAssetLayers(getFilteredPoints(activeFilter));
         }
         updateBadges();
       }
@@ -1527,6 +1528,90 @@
       let annotationDraft = null;
       let annotationSequence = 0;
       const localAnnotations = [];
+      // Modelos próprios simplificados, em escala simbólica, não tamanho físico.
+      function assetModelKind(type) {
+        if (['aircraft', 'geoint-aircraft'].includes(type)) return 'aircraft';
+        if (['ship', 'geoint-vessels'].includes(type)) return 'ship';
+        if (['satellite', 'geoint-orbital'].includes(type)) return 'satellite';
+        return null;
+      }
+      function partitionGraphicAssets(points, enabled, limit = 120) {
+        const models = [], markers = [];
+        for (const point of points) {
+          if (enabled && models.length < limit && assetModelKind(point.type) &&
+              Number.isFinite(point.lat) && Number.isFinite(point.lng) &&
+              Math.abs(point.lat) <= 90 && Math.abs(point.lng) <= 180) models.push(point);
+          else markers.push(point);
+        }
+        return {models, markers};
+      }
+      const modelTemplates = new Map();
+      let modelsAvailable = false;
+      let modelsRequested = true;
+      let lastGraphicAssets = [];
+      function createAssetModel(asset) {
+        const kind = assetModelKind(asset.type);
+        if (!modelTemplates.has(kind)) {
+          const group = new THREE.Group();
+          const white = new THREE.MeshBasicMaterial({color: 0xe2e8f0});
+          const dark = new THREE.MeshBasicMaterial({color: 0x52687b});
+          const blue = new THREE.MeshBasicMaterial({color: 0x387db0});
+          const orange = new THREE.MeshBasicMaterial({color: 0xe9a36a});
+          function box(w, h, d, x, y, z, material, angle = 0) {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+            mesh.position.set(x, y, z); mesh.rotation.z = angle; group.add(mesh);
+          }
+          if (kind === 'aircraft') {
+            const body = new THREE.Mesh(new THREE.CapsuleGeometry(.19, 1.6, 3, 8), white);
+            group.add(body);
+            box(1.1,.26,.12,-.54,-.13,0,white,.35);
+            box(1.1,.26,.12,.54,-.13,0,white,-.35);
+            box(.78,.22,.12,0,-.76,0,white);
+            box(.13,.36,.38,0,-.77,.19,dark);
+            box(.18,.43,.18,-.48,-.08,-.11,dark);
+            box(.18,.43,.18,.48,-.08,-.11,dark);
+          } else if (kind === 'ship') {
+            box(.65,1.65,.25,0,0,0,dark);
+            const bow = new THREE.Mesh(new THREE.ConeGeometry(.38,.6,4), dark);
+            bow.position.y = 1.06; group.add(bow);
+            box(.52,.66,.24,0,.13,.23,orange);
+            box(.48,.38,.32,0,-.51,.26,white);
+          } else {
+            box(.62,.77,.48,0,0,0,white);
+            box(1.0,.50,.08,-.84,0,0,blue);
+            box(1.0,.50,.08,.84,0,0,blue);
+            box(.09,.92,.10,0,0,.29,dark);
+          }
+          group.scale.setScalar(.8);
+          modelTemplates.set(kind, group);
+        }
+        // Clones compartilham geometria/material; custo limitado a 3 templates.
+        const model = modelTemplates.get(kind).clone(true);
+        return model;
+      }
+      function renderAssetLayers(points) {
+        lastGraphicAssets = points;
+        const selection = partitionGraphicAssets(points, modelsAvailable && modelsRequested && document.getElementById('render-quality').dataset.resolved !== 'eco');
+        globe.pointsData(selection.markers);
+        if (modelsAvailable) globe.objectsData(selection.models);
+      }
+      function inspectGraphicAsset(asset) {
+        const inspector = document.getElementById('inspector');
+        const name = document.createElement('strong');
+        name.textContent = asset.label;
+        const info = document.createElement('small');
+        info.style.whiteSpace = 'pre-line';
+        info.textContent = [
+          'TIPO: ' + String(asset.type).toUpperCase(),
+          'LAT: ' + asset.lat.toFixed(4), 'LNG: ' + asset.lng.toFixed(4),
+          'FONTE: ' + (asset.source || (asset.type === 'earthquake' ? 'USGS' : 'Demonstração ou fonte não identificada')),
+          'NATUREZA: ' + (asset.dataKind || 'Verifique a origem'),
+          'HORÁRIO DO DADO: ' + (asset.observedAt ?? 'Não informado'),
+          'CONSULTA: ' + (asset.fetchedAt ?? 'Não informada'),
+          ...(assetModelKind(asset.type) ? ['Modelo ilustrativo · escala e orientação não reais'] : [])
+        ].join('\n');
+        inspector.replaceChildren(name, info); inspector.hidden = false;
+      }
       const globe = Globe()(document.getElementById('globe'))
         .globeImageUrl(textures[currentTexture])
         .bumpImageUrl('https://unpkg.com/three-globe@2.43.0/example/img/earth-topology.png')
@@ -1536,11 +1621,7 @@
         .atmosphereAltitude(0.18)
         .pointLat('lat').pointLng('lng').pointAltitude('altitude').pointColor('color').pointRadius(0.5)
         .pointLabel(d => `<div style="background:rgba(15,23,42,0.92);padding:6px 10px;border-radius:8px;border:1px solid rgba(56,189,248,0.35);font-family:sans-serif;font-size:12px;box-shadow:0 8px 16px rgba(0,0,0,0.5);"><b>${escapeHtml(d.label)}</b><br><span style="color:#94a3b8;font-size:10px;">${escapeHtml(d.type === 'earthquake' ? 'USGS · Fonte Pública' : String(d.type).toUpperCase() + ' · Ativo Tático')}</span></div>`)
-        .onPointClick(asset => {
-          const inspector = document.getElementById('inspector');
-          inspector.innerHTML = `<strong>${escapeHtml(asset.label)}</strong><small>TIPO: ${escapeHtml(String(asset.type).toUpperCase())}<br>LAT: ${asset.lat.toFixed(4)}<br>LNG: ${asset.lng.toFixed(4)}<br>FONTE: ${escapeHtml(asset.source || (asset.type === 'earthquake' ? 'USGS' : 'Demonstração ou fonte não identificada'))}<br>NATUREZA: ${escapeHtml(asset.dataKind || 'Verifique a origem')}<br>HORÁRIO DO DADO: ${escapeHtml(asset.observedAt ?? 'Não informado')}<br>CONSULTA: ${escapeHtml(asset.fetchedAt ?? 'Não informada')}</small>`;
-          inspector.hidden = false;
-        })
+        .onPointClick(inspectGraphicAsset)
         .onGlobeClick(async ({ lat, lng }) => {
           if (annotationDraft && !document.body.classList.contains('focus-mode') && !document.body.classList.contains('map-mode')) {
             if (annotationDraft.vertices.length >= 100 || (annotationDraft.kind === 'pin' && annotationDraft.vertices.length)) {
@@ -1623,7 +1704,26 @@
         .ringsData(buildRingsData())
         .ringLat('lat').ringLng('lng').ringColor('color').ringMaxRadius('maxRadius')
         .ringPropagationSpeed('propagationSpeed').ringRepeatPeriod('repeatPeriod')
-        .pointsData(getFilteredPoints('all'));
+        .pointsData([]);
+      if (window.THREE && typeof THREE.CapsuleGeometry === 'function' &&
+          ['objectsData','objectLat','objectLng','objectAltitude','objectThreeObject','objectFacesSurface','objectLabel','onObjectClick'].every(key => typeof globe[key] === 'function')) {
+        try {
+          globe.objectLat('lat').objectLng('lng').objectAltitude(asset => Math.max(.012, Number(asset.altitude) || 0))
+            .objectFacesSurface(true).objectThreeObject(createAssetModel)
+            .objectLabel(asset => escapeHtml(asset.label) + ' · modelo ilustrativo')
+            .onObjectClick(inspectGraphicAsset);
+          modelsAvailable = true;
+        } catch (error) { console.info('Modelos indisponíveis; mantendo marcadores.', error); }
+      }
+      const modelToggle = document.getElementById('model-toggle');
+      modelToggle.disabled = !modelsAvailable;
+      modelToggle.addEventListener('click', () => {
+        modelsRequested = !modelsRequested;
+        modelToggle.setAttribute('aria-pressed', String(modelsRequested));
+        modelToggle.textContent = modelsRequested ? 'Modelos 3D: ligados' : 'Modelos 3D: desligados';
+        renderAssetLayers(lastGraphicAssets);
+      });
+      renderAssetLayers(getFilteredPoints('all'));
       // Enquadramento inicial da América do Sul, sem acessar localização pessoal.
       globe.pointOfView({ lat: -12, lng: -45, altitude: 2.15 }, 0);
 
@@ -1927,8 +2027,9 @@
           cloudsMesh.visible = profile.clouds;
           cloudsMesh.material.opacity = profile.opacity;
         }
-        refreshEarthTexture(profile.mode);
         renderQualityControl.dataset.resolved = profile.mode;
+        renderAssetLayers(lastGraphicAssets);
+        refreshEarthTexture(profile.mode);
         renderQualityControl.title = 'Qualidade ativa: ' + profile.mode +
           ' · resolução ' + profile.pixelRatio.toFixed(2) + '×';
       }
@@ -2031,7 +2132,7 @@
         if (typeof assetSearchInput !== 'undefined' && assetSearchInput.value.trim()) {
           applyAssetSearch();
         } else {
-          globe.pointsData(getFilteredPoints(layer));
+          renderAssetLayers(getFilteredPoints(layer));
           const feedback = document.getElementById('search-feedback');
           if (feedback) feedback.textContent = layer === 'all' ? 'TODOS' : layer.toUpperCase();
         }
@@ -2131,7 +2232,7 @@
         const layer = document.querySelector('[data-layer].active')?.dataset.layer || 'all';
         globe.ringsData(buildRingsData());
         if (assetSearchInput.value.trim()) applyAssetSearch();
-        else globe.pointsData(getFilteredPoints(layer));
+        else renderAssetLayers(getFilteredPoints(layer));
       }
       demoButton.addEventListener('click', () => {
         const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -2210,7 +2311,7 @@
         const query = assetSearchInput.value.trim().toLocaleLowerCase('pt-BR');
         const activeLayer = document.querySelector('[data-layer].active')?.dataset.layer || 'all';
         if (!query) {
-          globe.pointsData(getFilteredPoints(activeLayer));
+          renderAssetLayers(getFilteredPoints(activeLayer));
           searchFeedback.textContent = activeLayer === 'all' ? 'TODOS' : activeLayer.toUpperCase();
           return;
         }
@@ -2232,7 +2333,7 @@
             label: `Geofence: ${fence.name} · ${fence.radius_meters}m`
           }));
         const matches = [...matchingAssets, ...matchingFences];
-        globe.pointsData(matches);
+        renderAssetLayers(matches);
         searchFeedback.textContent = matches.length ? `${matches.length} RESULTADO(S)` : 'SEM RESULTADOS';
         if (matches.length === 1) {
           globe.pointOfView({ lat: matches[0].lat, lng: matches[0].lng, altitude: 1.8 }, 700);

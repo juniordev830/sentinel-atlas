@@ -57,7 +57,7 @@ test('filtros anunciam qual camada está selecionada', () => {
   };
   const updates = [];
   const context = { document, assetSearchInput: { value: '' },
-    globe: { pointsData(value) { updates.push(value); } },
+    renderAssetLayers(value) { updates.push(value); },
     getFilteredPoints: layer => layer };
   const code = snippet("document.querySelectorAll('[data-layer]').forEach(button =>", 'async function fetchBackendGeofences()');
   vm.runInNewContext(code, context);
@@ -270,7 +270,7 @@ test('atualização de camada mantém filtro de pesquisa ativo', () => {
     },
     applyAssetSearch() { searched++; },
     updateBadges() { refreshed++; },
-    globe: { pointsData() { globeUpdated++; } },
+    renderAssetLayers() { globeUpdated++; },
     getFilteredPoints: () => []
   };
   vm.runInNewContext(
@@ -296,10 +296,8 @@ test('pesquisa textual respeita a camada visual selecionada', () => {
     ],
     loadedGeofences: [{ name: 'Recife', latitude: -8, longitude: -35, radius_meters: 100 }],
     document: { querySelector: () => ({ dataset: { layer: 'aircraft' } }) },
-    globe: {
-      pointsData(points) { rendered.push(points); },
-      pointOfView() {}
-    },
+    renderAssetLayers(points) { rendered.push(points); },
+    globe: { pointOfView() {} },
     getFilteredPoints() { return []; }
   };
   vm.runInNewContext(
@@ -927,4 +925,28 @@ test('textura HD preserva imagem anterior e ignora resposta atrasada no modo not
   images[2].onload();
   assert.equal(calls.at(-1), 'hd.jpg');
   assert.match(credit.textContent, /NASA Earth Observatory/);
+});
+
+
+test('modelos 3D classificam fontes e limitam carga sem perder marcadores', () => {
+  const context = {};
+  vm.runInNewContext(snippet('function assetModelKind(', 'const modelTemplates =') +
+    '\nglobalThis.partitionGraphicAssets = partitionGraphicAssets;', context);
+  const types = ['aircraft', 'geoint-vessels', 'satellite', 'geoint-orbital', 'earthquake', 'annotation'];
+  const points = types.map(type => ({type, lat: -5, lng: -35}));
+  const selected = context.partitionGraphicAssets(points, true, 3);
+  assert.equal(selected.models.length, 3);
+  assert.equal(selected.markers.length, 3);
+  assert.equal(selected.markers[0].type, 'geoint-orbital');
+  assert.equal(context.partitionGraphicAssets(points, false).markers.length, points.length);
+  assert.equal(context.partitionGraphicAssets([{type:'ship', lat:91, lng:0}], true).models.length, 0);
+});
+
+test('objetos 3D mantêm interação e compartilham geometria', () => {
+  const code = snippet('function createAssetModel(', 'function inspectGraphicAsset(');
+  assert.match(code, /modelTemplates\.get\(kind\)\.clone\(true\)/);
+  assert.match(code, /globe\.objectsData\(selection\.models\)/);
+  assert.match(code, /globe\.pointsData\(selection\.markers\)/);
+  assert.match(html, /\.onObjectClick\(inspectGraphicAsset\)/);
+  assert.match(html, /\.onPointClick\(inspectGraphicAsset\)/);
 });

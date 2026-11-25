@@ -1059,6 +1059,8 @@
       body.map-mode .earth-image-credit { display: none; }
       @media (max-width: 900px) { .earth-image-credit { left: 10px; bottom: 5px; font-size: 10px; } }
       #earth-detail { min-height: 36px; background: #151e25; color: #e2e8f0; border: 1px solid #34424e; border-radius: 7px; padding: 5px 8px; }
+      #fps-meter { font: 11px 'JetBrains Mono', monospace; color: #b8cad6; min-width: 76px; }
+      #fps-meter[hidden] { display: none; }
     </style>
   </head>
   <body>
@@ -1275,6 +1277,8 @@
               <option value="eco">Econômico</option>
             </select>
           </label>
+          <button id="fps-toggle" type="button" aria-pressed="false" title="Estimativa da cadência de quadros do navegador">FPS</button>
+          <span id="fps-meter" hidden role="status" aria-label="Estimativa de FPS do navegador"></span>
           <button id="rotation-toggle" aria-pressed="true" title="Controlar o giro automático do globo">⏸️ Pausar giro</button>
           <button id="reset-camera" title="Recentralizar o globo em uma visão global">🎯 Visão global</button>
           <button id="map-view" aria-pressed="false">🛰️ Mapa satélite</button>
@@ -1800,6 +1804,48 @@
         }, undefined, () => console.info('Textura noturna indisponível; não há luzes urbanas.'));
       }
 
+      // Monitor opt-in: cadência do requestAnimationFrame, não medição de uso da GPU.
+      function estimateFrameRate(frames, elapsedMs) {
+        if (!Number.isFinite(frames) || !Number.isFinite(elapsedMs) || frames < 0 || elapsedMs < 1000) return null;
+        return Math.round(frames * 1000 / elapsedMs);
+      }
+      function cloudRotationDelta(elapsedMs) {
+        return Number.isFinite(elapsedMs) ? Math.min(Math.max(elapsedMs, 0), 100) * .0000072 : 0;
+      }
+      const fpsToggle = document.getElementById('fps-toggle');
+      const fpsMeter = document.getElementById('fps-meter');
+      let fpsRequested = false, fpsFrame = null, fpsStart = null, fpsCount = 0;
+      function tickFps(now) {
+        fpsFrame = null;
+        if (!fpsRequested || document.hidden || document.body.classList.contains('map-mode')) {
+          fpsStart = null; fpsCount = 0; fpsMeter.textContent = 'FPS pausado'; return;
+        }
+        if (fpsStart === null) fpsStart = now;
+        else {
+          fpsCount++;
+          const fps = estimateFrameRate(fpsCount, now - fpsStart);
+          if (fps !== null) { fpsMeter.textContent = fps + ' FPS est.'; fpsStart = now; fpsCount = 0; }
+        }
+        fpsFrame = requestAnimationFrame(tickFps);
+      }
+      function syncFpsMonitor() {
+        if (fpsFrame !== null) cancelAnimationFrame(fpsFrame);
+        fpsFrame = null; fpsStart = null; fpsCount = 0;
+        fpsMeter.hidden = !fpsRequested;
+        if (!fpsRequested) return;
+        fpsMeter.textContent = 'FPS · aguardando';
+        if (!document.hidden && !document.body.classList.contains('map-mode')) fpsFrame = requestAnimationFrame(tickFps);
+        else fpsMeter.textContent = 'FPS pausado';
+      }
+      fpsToggle.addEventListener('click', () => {
+        fpsRequested = !fpsRequested;
+        fpsToggle.setAttribute('aria-pressed', String(fpsRequested));
+        syncFpsMonitor();
+      });
+      document.addEventListener('visibilitychange', syncFpsMonitor);
+      const fpsModeObserver = new MutationObserver(syncFpsMonitor);
+      fpsModeObserver.observe(document.body,{attributes:true,attributeFilter:['class']});
+
       // Nuvens independentes carregadas sob demanda (evita gastar dados no modo Econômico).
       let cloudsRequested = false;
       function loadClouds() {
@@ -1821,13 +1867,17 @@
             globe.scene().add(cloudsMesh);
             applyRenderQuality();
 
-            (function rotateClouds() {
-              if (cloudsMesh?.visible && rotationRequested && !document.hidden &&
+            let lastCloudFrame = null;
+            function rotateClouds(now) {
+              const elapsed = lastCloudFrame === null ? 0 : now - lastCloudFrame;
+              lastCloudFrame = now;
+              if (cloudsMesh?.visible && rotationRequested && !motionPreference.matches && !document.hidden &&
                   !document.body.classList.contains('map-mode')) {
-                cloudsMesh.rotation.y += 0.00012;
+                cloudsMesh.rotation.y += cloudRotationDelta(elapsed);
               }
               requestAnimationFrame(rotateClouds);
-            })();
+            }
+            requestAnimationFrame(rotateClouds);
           },
           undefined,
           () => console.info('Textura de nuvens indisponível; globo continua operando.')

@@ -55,6 +55,37 @@ class GeofenceStore:
                     ON positions(timestamp DESC, id DESC)
                 """)
 
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS browser_sessions (
+                        digest TEXT PRIMARY KEY,
+                        expires_at INTEGER NOT NULL
+                    )
+                """)
+                connection.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_browser_sessions_expiry
+                    ON browser_sessions(expires_at)
+                """)
+
+    def create_session(self, digest: str, now: int, expires_at: int) -> bool:
+        with closing(self._connect()) as connection, connection:
+            connection.execute("DELETE FROM browser_sessions WHERE expires_at <= ?", (now,))
+            cursor = connection.execute("""
+                INSERT INTO browser_sessions (digest, expires_at)
+                SELECT ?, ? WHERE (SELECT COUNT(*) FROM browser_sessions) < 4096
+            """, (digest, expires_at))
+            return cursor.rowcount == 1
+
+    def session_valid(self, digest: str, now: int) -> bool:
+        with closing(self._connect()) as connection:
+            return connection.execute(
+                "SELECT 1 FROM browser_sessions WHERE digest = ? AND expires_at > ?",
+                (digest, now),
+            ).fetchone() is not None
+
+    def revoke_session(self, digest: str) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute("DELETE FROM browser_sessions WHERE digest = ?", (digest,))
+
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.path)
 

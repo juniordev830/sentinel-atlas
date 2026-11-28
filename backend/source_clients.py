@@ -3,30 +3,56 @@
 from __future__ import annotations
 
 import json
-from urllib.error import URLError
-from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 class SourceUnavailable(RuntimeError):
     pass
 
 
-def fetch_json(url: str, timeout: float = 10) -> object:
-    request = Request(url, headers={"User-Agent": "Sentinel-Atlas/0.1"})
+MAX_SOURCE_BYTES = 16 * 1024 * 1024
+
+
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+source_opener = build_opener(NoRedirect())
+
+
+def _fetch_bytes(url: str, timeout: float) -> bytes:
     try:
-        with urlopen(request, timeout=timeout) as response:
-            return json.load(response)
-    except (OSError, URLError, TimeoutError, ValueError) as error:
-        raise SourceUnavailable(f"Fonte indisponível: {url}") from error
+        parsed = urlsplit(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username is not None:
+            raise ValueError("URL de fonte inválida")
+        request = Request(url, headers={"User-Agent": "Sentinel-Atlas/0.1", "Accept-Encoding": "identity"})
+        with source_opener.open(request, timeout=timeout) as response:
+            length = response.headers.get("Content-Length")
+            if length is not None and int(length) > MAX_SOURCE_BYTES:
+                raise ValueError("Tamanho anunciado acima do limite")
+            data = response.read(MAX_SOURCE_BYTES + 1)
+            if len(data) > MAX_SOURCE_BYTES:
+                raise ValueError("Resposta acima do limite")
+            return data
+    except (OSError, ValueError) as error:
+        raise SourceUnavailable("Fonte externa indisponível ou resposta inválida") from error
+
+
+def fetch_json(url: str, timeout: float = 10) -> object:
+    data = _fetch_bytes(url, timeout)
+    try:
+        return json.loads(data)
+    except (ValueError, RecursionError) as error:
+        raise SourceUnavailable("Resposta JSON inválida") from error
 
 
 def fetch_text(url: str, timeout: float = 10) -> str:
-    request = Request(url, headers={"User-Agent": "Sentinel-Atlas/0.1"})
     try:
-        with urlopen(request, timeout=timeout) as response:
-            return response.read().decode("utf-8")
-    except (OSError, URLError, TimeoutError, UnicodeDecodeError) as error:
-        raise SourceUnavailable(f"Fonte indisponível: {url}") from error
+        return _fetch_bytes(url, timeout).decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise SourceUnavailable("Resposta de texto inválida") from error
 
 
 def parse_tle_text(payload: str) -> list[dict[str, str]]:

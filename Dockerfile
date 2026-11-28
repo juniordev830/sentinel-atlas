@@ -12,4 +12,4 @@ RUN useradd --system --uid 10001 --home-dir /app --no-create-home atlas \
 USER atlas
 EXPOSE 8000
 # 0.0.0.0 is inside the container only. Compose publishes to 127.0.0.1.
-CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000", "--ws-max-size", "16384", "--ws-max-queue", "4"]

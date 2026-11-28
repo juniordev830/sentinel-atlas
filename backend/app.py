@@ -8,6 +8,7 @@ import math
 import hmac
 import os
 import sys
+from secrets import token_urlsafe
 import time
 from urllib.parse import urlsplit
 from dataclasses import asdict
@@ -120,30 +121,50 @@ SESSION_COOKIE_NAME = "sentinel_session"
 SESSION_TTL_SECONDS = 60 * 60
 
 
-def _session_signature(expires_at: int) -> str:
-    if not settings.api_token:
-        return ""
-    message = f"sentinel-browser-session:{expires_at}".encode("utf-8")
-    return hmac.new(settings.api_token.encode("utf-8"), message, "sha256").hexdigest()
+LOGIN_WINDOW_SECONDS = 60
+LOGIN_ATTEMPTS_PER_WINDOW = 10
+MAX_LOGIN_CLIENTS = 4096
+MAX_LOGIN_ATTEMPTS = 120
+MAX_POSITION_SOCKETS = 64
+WS_SESSION_CHECK_SECONDS = 5
+WS_POSITION_WINDOW_SECONDS = 1
+MAX_WS_POSITIONS_PER_WINDOW = 5
+
+_login_buckets: dict[str, tuple[int, int]] = {}
+_login_window = -1
+_login_total = 0
+_socket_slots = asyncio.BoundedSemaphore(MAX_POSITION_SOCKETS)
 
 
-def _create_session_cookie() -> str:
-    expires_at = int(time.time()) + SESSION_TTL_SECONDS
-    return f"{expires_at}.{_session_signature(expires_at)}"
+def _allow_login(address: str) -> bool:
+    # Called on the event loop before request body parsing.
+    global _login_window, _login_total
+    window = int(time.monotonic() / LOGIN_WINDOW_SECONDS)
+    if window != _login_window:
+        _login_buckets.clear()
+        _login_window = window
+        _login_total = 0
+    if _login_total >= MAX_LOGIN_ATTEMPTS:
+        return False
+    if address not in _login_buckets and len(_login_buckets) >= MAX_LOGIN_CLIENTS:
+        return False
+    _, count = _login_buckets.get(address, (window, 0))
+    if count >= LOGIN_ATTEMPTS_PER_WINDOW:
+        return False
+    _login_total += 1
+    _login_buckets[address] = (window, count + 1)
+    return True
+
+
+def _session_digest(value: str | None) -> str | None:
+    if not value or len(value) != 43 or not value.isascii() or not settings.api_token:
+        return None
+    return hmac.new(settings.api_token.encode("utf-8"), value.encode("ascii"), "sha256").hexdigest()
 
 
 def _valid_session_cookie(value: str | None) -> bool:
-    if not value or not settings.api_token:
-        return False
-    try:
-        expires_text, supplied_signature = value.split(".", 1)
-        expires_at = int(expires_text)
-    except (ValueError, TypeError):
-        return False
-    if expires_at <= int(time.time()):
-        return False
-    expected_signature = _session_signature(expires_at)
-    return hmac.compare_digest(supplied_signature.encode("utf-8"), expected_signature.encode("utf-8"))
+    digest = _session_digest(value)
+    return digest is not None and store.session_valid(digest, int(time.time()))
 
 
 def _is_same_origin(origin: str | None, host: str | None, scheme: str) -> bool:
@@ -160,12 +181,22 @@ def _is_same_origin(origin: str | None, host: str | None, scheme: str) -> bool:
 @app.middleware("http")
 async def optional_token_auth(request: Request, call_next):
     path = request.url.path
+    if path == "/api/session" and request.method == "POST":
+        address = request.client.host if request.client else "unknown"
+        if not _allow_login(address):
+            return JSONResponse(
+                status_code=429, content={"detail": "Muitas tentativas de autenticação"},
+                headers={"Retry-After": str(LOGIN_WINDOW_SECONDS)},
+            )
     public_paths = {"/api/health", "/api/public-config", "/api/session", "/api/session/logout"}
     authorization = request.headers.get("authorization", "")
     bearer_valid = bool(settings.api_token) and hmac.compare_digest(
         authorization.encode("utf-8"), f"Bearer {settings.api_token}".encode("utf-8")
     )
-    session_valid = _valid_session_cookie(request.cookies.get(SESSION_COOKIE_NAME))
+    session_cookie = request.cookies.get(SESSION_COOKIE_NAME)
+    session_valid = bool(session_cookie) and not bearer_valid and await asyncio.to_thread(
+        _valid_session_cookie, session_cookie,
+    )
 
     if path == "/" and settings.api_token and not (bearer_valid or session_valid):
         return RedirectResponse(url="/login", status_code=303)
@@ -264,9 +295,18 @@ def create_browser_session(payload: SessionLoginInput, request: Request, respons
         raise HTTPException(status_code=403, detail="Origem da requisição inválida")
     if not hmac.compare_digest(payload.token.encode("utf-8"), settings.api_token.encode("utf-8")):
         raise HTTPException(status_code=401, detail="Token inválido")
+    now = int(time.time())
+    session_id = token_urlsafe(32)
+    digest = _session_digest(session_id)
+    if digest is None or not store.create_session(digest, now, now + SESSION_TTL_SECONDS):
+        raise HTTPException(status_code=503, detail="Limite de sessões ativas atingido")
+    old_digest = _session_digest(request.cookies.get(SESSION_COOKIE_NAME))
+    if old_digest:
+        store.revoke_session(old_digest)
+    response.headers["Cache-Control"] = "no-store"
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
-        value=_create_session_cookie(),
+        value=session_id,
         max_age=SESSION_TTL_SECONDS,
         httponly=True,
         secure=settings.environment == "production",
@@ -277,7 +317,14 @@ def create_browser_session(payload: SessionLoginInput, request: Request, respons
 
 
 @app.post("/api/session/logout")
-def end_browser_session(response: Response) -> dict[str, bool]:
+def end_browser_session(request: Request, response: Response) -> dict[str, bool]:
+    origin = request.headers.get("origin")
+    if origin and not _is_same_origin(origin, request.headers.get("host"), request.url.scheme):
+        raise HTTPException(status_code=403, detail="Origem da requisição inválida")
+    digest = _session_digest(request.cookies.get(SESSION_COOKIE_NAME))
+    if digest:
+        store.revoke_session(digest)
+    response.headers["Cache-Control"] = "no-store"
     response.delete_cookie(
         key=SESSION_COOKIE_NAME,
         path="/",
@@ -549,7 +596,8 @@ async def accept_position_socket(websocket: WebSocket) -> bool:
     bearer_valid = bool(settings.api_token) and hmac.compare_digest(
         authorization.encode("utf-8"), f"Bearer {settings.api_token}".encode("utf-8")
     )
-    session_valid = _valid_session_cookie(websocket.cookies.get(SESSION_COOKIE_NAME))
+    session_cookie = websocket.cookies.get(SESSION_COOKIE_NAME)
+    session_valid = bool(session_cookie) and not bearer_valid and await asyncio.to_thread(_valid_session_cookie, session_cookie)
     if settings.api_token and not (bearer_valid or session_valid):
         await websocket.close(code=1008, reason="Autenticação necessária")
         return False
@@ -560,8 +608,25 @@ async def accept_position_socket(websocket: WebSocket) -> bool:
             await websocket.close(code=1008, reason="Origem da conexão inválida")
             return False
 
-    await websocket.accept()
+    if _socket_slots.locked():
+        await websocket.close(code=1013, reason="Limite de conexões atingido")
+        return False
+    await _socket_slots.acquire()
+    websocket.state.session_cookie = session_cookie if session_valid else None
+    try:
+        await websocket.accept()
+    except BaseException:
+        _socket_slots.release()
+        raise
     return True
+
+
+async def _socket_session_valid(websocket: WebSocket) -> bool:
+    browser_session = websocket.state.session_cookie
+    if browser_session is None or await asyncio.to_thread(_valid_session_cookie, browser_session):
+        return True
+    await websocket.close(code=1008, reason="Sessão expirada ou revogada")
+    return False
 
 
 @app.websocket("/ws/demo/geofence")
@@ -574,6 +639,8 @@ async def demo_geofence(websocket: WebSocket) -> None:
         for index, longitude in enumerate((-36.00, -35.42, -35.20, -34.40)):
             if index:
                 await asyncio.sleep(0.85)
+            if not await _socket_session_valid(websocket):
+                return
             position = Position(fence.latitude, longitude, time.time())
             await websocket.send_json({
                 "position": asdict(position), "fence": asdict(fence),
@@ -582,17 +649,39 @@ async def demo_geofence(websocket: WebSocket) -> None:
         await websocket.close()
     except (WebSocketDisconnect, OSError):
         return
+    finally:
+        _socket_slots.release()
 
 
 @app.websocket("/ws/positions")
 async def positions(websocket: WebSocket) -> None:
     if not await accept_position_socket(websocket):
         return
+    window_start = time.monotonic()
+    count = 0
     try:
-        while True:
-            message = await websocket.receive_text()
+        while await _socket_session_valid(websocket):
+            try:
+                incoming = await asyncio.wait_for(websocket.receive(), timeout=WS_SESSION_CHECK_SECONDS)
+            except TimeoutError:
+                continue
+            if incoming["type"] == "websocket.disconnect":
+                break
+            message = incoming.get("text")
+            if message is None:
+                await websocket.close(code=1003, reason="Apenas mensagens de texto são aceitas")
+                return
             if len(message.encode("utf-8")) > 16_384:
                 await websocket.close(code=1009, reason="Mensagem excede o limite de 16 KiB")
+                return
+            now = time.monotonic()
+            if now - window_start >= WS_POSITION_WINDOW_SECONDS:
+                window_start, count = now, 0
+            count += 1
+            if count > MAX_WS_POSITIONS_PER_WINDOW:
+                await websocket.close(code=1008, reason="Limite de frequência excedido")
+                return
+            if not await _socket_session_valid(websocket):
                 return
             try:
                 payload = PositionInput.model_validate_json(message)
@@ -600,8 +689,9 @@ async def positions(websocket: WebSocket) -> None:
                 await websocket.close(code=1008, reason="Posição inválida")
                 return
             position = Position(payload.latitude, payload.longitude, payload.timestamp if payload.timestamp is not None else time.time())
-            store.save_position(position)
+            await asyncio.to_thread(store.save_position, position)
             events = []
+            notifications = []
             for fence, engine in geofences.values():
                 event = engine.process(position)
                 events.append({
@@ -610,7 +700,7 @@ async def positions(websocket: WebSocket) -> None:
                     "distance_meters": round(distance_meters(position, fence), 1),
                 })
                 if event:
-                    send_webhook(settings.alert_webhook_url, {
+                    notifications.append({
                         "type": "geofence",
                         "name": fence.name,
                         "event": event,
@@ -618,9 +708,14 @@ async def positions(websocket: WebSocket) -> None:
                         "longitude": position.longitude,
                         "timestamp": position.timestamp,
                     })
+            if settings.alert_webhook_url:
+                for notification in notifications:
+                    await asyncio.to_thread(send_webhook, settings.alert_webhook_url, notification)
             await websocket.send_text(json.dumps({"position": asdict(position), "events": events}))
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, OSError):
         return
+    finally:
+        _socket_slots.release()
 
 
 # Mantido por último para não interceptar as rotas da API e do WebSocket.

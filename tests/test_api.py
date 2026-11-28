@@ -465,11 +465,9 @@ def test_websocket_rate_limit_rejects_before_writing(monkeypatch):
     assert len(saved) == 1
 
 
-def test_browser_login_attempts_are_limited(monkeypatch):
+def test_browser_login_attempts_are_limited(monkeypatch, tmp_path):
     _configure_browser_auth(monkeypatch)
-    monkeypatch.setattr(app_module, "_login_window", -1)
-    monkeypatch.setattr(app_module, "_login_buckets", {})
-    monkeypatch.setattr(app_module, "_login_total", 0)
+    monkeypatch.setattr(app_module, "limits", app_module.SharedLimits(tmp_path / "limits.sqlite3"))
     monkeypatch.setattr(app_module, "LOGIN_ATTEMPTS_PER_WINDOW", 2)
     session = TestClient(app)
     for expected in (401, 401, 429):

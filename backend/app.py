@@ -7,6 +7,8 @@ import json
 import math
 import hmac
 import os
+import logging
+import sqlite3
 import sys
 from secrets import token_urlsafe
 import time
@@ -27,6 +29,7 @@ if str(ROOT) not in sys.path:
 from python.gps_core import AutomationEngine, Geofence, Position, distance_meters  # noqa: E402
 from python.settings import Settings  # noqa: E402
 from backend.storage import GeofenceStore  # noqa: E402
+from backend.shared_limits import SharedLimits  # noqa: E402
 from backend.source_clients import SourceUnavailable, fetch_celestrak, fetch_json, fetch_opensky, fetch_text, parse_tle_text  # noqa: E402
 from backend.alerts import send_webhook  # noqa: E402
 from backend.routing import bicycle_route  # noqa: E402
@@ -112,6 +115,8 @@ app = FastAPI(title="Sentinel Atlas GPS API", version="0.1.0")
 settings = Settings.from_environment()
 ai_analyzer = GeoINTAnalyzer()
 store = GeofenceStore(os.getenv("SENTINEL_DB_PATH", str(ROOT / ".data" / "sentinel.sqlite3")))
+limits = SharedLimits(os.getenv("SENTINEL_LIMITS_DB_PATH") or f"{store.path}.limits")
+logger = logging.getLogger(__name__)
 geofences: dict[str, tuple[Geofence, AutomationEngine]] = {}
 for saved_fence in store.list():
     geofences[saved_fence.name] = (saved_fence, AutomationEngine(saved_fence))
@@ -123,37 +128,26 @@ SESSION_TTL_SECONDS = 60 * 60
 
 LOGIN_WINDOW_SECONDS = 60
 LOGIN_ATTEMPTS_PER_WINDOW = 10
-MAX_LOGIN_CLIENTS = 4096
 MAX_LOGIN_ATTEMPTS = 120
 MAX_POSITION_SOCKETS = 64
 WS_SESSION_CHECK_SECONDS = 5
 WS_POSITION_WINDOW_SECONDS = 1
 MAX_WS_POSITIONS_PER_WINDOW = 5
 
-_login_buckets: dict[str, tuple[int, int]] = {}
-_login_window = -1
-_login_total = 0
-_socket_slots = asyncio.BoundedSemaphore(MAX_POSITION_SOCKETS)
+MAX_SOURCE_REQUESTS = 16
+SOCKET_LEASE_SECONDS = 60
+SOURCE_LEASE_SECONDS = 60
+EXTERNAL_PATHS = frozenset({
+    "/api/sources/satellites", "/api/sources/starlink", "/api/sources/aircraft",
+    "/api/routes/bicycle", "/api/map/features", "/api/location/info",
+})
 
 
-def _allow_login(address: str) -> bool:
-    # Called on the event loop before request body parsing.
-    global _login_window, _login_total
-    window = int(time.monotonic() / LOGIN_WINDOW_SECONDS)
-    if window != _login_window:
-        _login_buckets.clear()
-        _login_window = window
-        _login_total = 0
-    if _login_total >= MAX_LOGIN_ATTEMPTS:
-        return False
-    if address not in _login_buckets and len(_login_buckets) >= MAX_LOGIN_CLIENTS:
-        return False
-    _, count = _login_buckets.get(address, (window, 0))
-    if count >= LOGIN_ATTEMPTS_PER_WINDOW:
-        return False
-    _login_total += 1
-    _login_buckets[address] = (window, count + 1)
-    return True
+async def _release_lease(lease: str) -> None:
+    try:
+        await asyncio.to_thread(limits.release, lease)
+    except sqlite3.OperationalError:
+        logger.warning("Não foi possível liberar a cota imediatamente; expiração automática ativa.")
 
 
 def _session_digest(value: str | None) -> str | None:
@@ -183,7 +177,16 @@ async def optional_token_auth(request: Request, call_next):
     path = request.url.path
     if path == "/api/session" and request.method == "POST":
         address = request.client.host if request.client else "unknown"
-        if not _allow_login(address):
+        key = hmac.new((settings.api_token or "local-mode").encode("utf-8"),
+                       address.encode("utf-8"), "sha256").hexdigest()
+        try:
+            allowed = await asyncio.to_thread(
+                limits.allow_login, key, int(time.time()) // LOGIN_WINDOW_SECONDS,
+                LOGIN_ATTEMPTS_PER_WINDOW, MAX_LOGIN_ATTEMPTS,
+            )
+        except sqlite3.OperationalError:
+            return JSONResponse(status_code=503, content={"detail": "Cota de autenticação indisponível"})
+        if not allowed:
             return JSONResponse(
                 status_code=429, content={"detail": "Muitas tentativas de autenticação"},
                 headers={"Retry-After": str(LOGIN_WINDOW_SECONDS)},
@@ -218,6 +221,19 @@ async def optional_token_auth(request: Request, call_next):
                 request.url.scheme,
             ):
                 return JSONResponse(status_code=403, content={"detail": "Origem da requisição inválida"})
+
+    if request.method == "GET" and (path in EXTERNAL_PATHS or path.startswith("/api/geoint/layers/")):
+        try:
+            lease = await asyncio.to_thread(limits.acquire, "sources", MAX_SOURCE_REQUESTS, SOURCE_LEASE_SECONDS)
+        except sqlite3.OperationalError:
+            lease = None
+        if lease is None:
+            return JSONResponse(status_code=503, content={"detail": "Limite de consultas externas atingido"},
+                                headers={"Retry-After": "2"})
+        try:
+            return await call_next(request)
+        finally:
+            await _release_lease(lease)
 
     return await call_next(request)
 
@@ -603,20 +619,35 @@ async def accept_position_socket(websocket: WebSocket) -> bool:
             await websocket.close(code=1008, reason="Origem da conexão inválida")
             return False
 
-    if _socket_slots.locked():
+    try:
+        lease = await asyncio.to_thread(limits.acquire, "sockets", MAX_POSITION_SOCKETS, SOCKET_LEASE_SECONDS)
+    except sqlite3.OperationalError:
+        lease = None
+    if lease is None:
         await websocket.close(code=1013, reason="Limite de conexões atingido")
         return False
-    await _socket_slots.acquire()
+    websocket.state.lease = lease
+    websocket.state.lease_due = time.monotonic() + WS_SESSION_CHECK_SECONDS
     websocket.state.session_cookie = session_cookie if session_valid else None
     try:
         await websocket.accept()
     except BaseException:
-        _socket_slots.release()
+        await _release_lease(lease)
         raise
     return True
 
 
 async def _socket_session_valid(websocket: WebSocket) -> bool:
+    now = time.monotonic()
+    if now >= websocket.state.lease_due:
+        try:
+            renewed = await asyncio.to_thread(limits.renew, websocket.state.lease, SOCKET_LEASE_SECONDS)
+        except sqlite3.OperationalError:
+            renewed = False
+        if not renewed:
+            await websocket.close(code=1013, reason="Cota de conexão indisponível")
+            return False
+        websocket.state.lease_due = now + WS_SESSION_CHECK_SECONDS
     browser_session = websocket.state.session_cookie
     if browser_session is None or await asyncio.to_thread(_valid_session_cookie, browser_session):
         return True
@@ -645,7 +676,7 @@ async def demo_geofence(websocket: WebSocket) -> None:
     except (WebSocketDisconnect, OSError):
         return
     finally:
-        _socket_slots.release()
+        await _release_lease(websocket.state.lease)
 
 
 @app.websocket("/ws/positions")
@@ -705,12 +736,14 @@ async def positions(websocket: WebSocket) -> None:
                     })
             if settings.alert_webhook_url:
                 for notification in notifications:
+                    if not await _socket_session_valid(websocket):
+                        return
                     await asyncio.to_thread(send_webhook, settings.alert_webhook_url, notification)
             await websocket.send_text(json.dumps({"position": asdict(position), "events": events}))
     except (WebSocketDisconnect, OSError):
         return
     finally:
-        _socket_slots.release()
+        await _release_lease(websocket.state.lease)
 
 
 # Mantido por último para não interceptar as rotas da API e do WebSocket.

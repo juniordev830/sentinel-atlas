@@ -8,6 +8,7 @@ services:
       SENTINEL_ENV: production
       SENTINEL_API_TOKEN: ${SENTINEL_API_TOKEN:?Set a strong SENTINEL_API_TOKEN of at least 32 characters}
       SENTINEL_DB_PATH: /app/.data/sentinel.sqlite3
+      SENTINEL_POSITION_RETENTION_LIMIT: ${SENTINEL_POSITION_RETENTION_LIMIT:-}
       PYTHONDONTWRITEBYTECODE: "1"
     ports:
       - "127.0.0.1:8000:8000"

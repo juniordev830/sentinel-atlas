@@ -12,6 +12,7 @@ O **Sentinel Atlas** reúne um núcleo de geolocalização em Python, uma API as
 
 | Assunto | Onde consultar |
 | --- | --- |
+| Código e estudo | [Engenharia reversa](docs/ENGENHARIA_REVERSA.md) |
 | Instalação e execução local | [Executar localmente](#executar-localmente) |
 | Componentes e fluxo de dados | [Arquitetura](#arquitetura) |
 | Integração com fontes geoespaciais | [Fontes de dados](DATA_SOURCES.md) |
@@ -429,3 +430,9 @@ Os limites de login, WebSockets ativos e consultas externas são compartilhados 
 Para réplicas em hosts diferentes, aplique limites globais no proxy ou gateway da infraestrutura. SQLite neste projeto foi validado em disco local. O banco de sessões e o de posições também precisam de uma arquitetura apropriada antes da distribuição entre hosts.
 
 Para limitar o histórico, configure `SENTINEL_POSITION_RETENTION_LIMIT` e faça backup se precisar preservar registros históricos. O Compose encaminha essa variável para o contêiner.
+
+## Código e roteiro de estudo
+
+Como impedir que a indisponibilidade de uma fonte geográfica comprometa todas as camadas? O [guia de engenharia reversa](docs/ENGENHARIA_REVERSA.md) reúne o mapa dos módulos e uma pergunta técnica baseada no projeto.
+
+Mantido por [João Junior](https://github.com/juniordev830).

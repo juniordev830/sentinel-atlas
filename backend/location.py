@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-import httpx
+
+from backend.source_clients import SourceUnavailable, fetch_json
 
 logger = logging.getLogger(__name__)
 
@@ -25,31 +26,23 @@ def get_location_info(lat: float, lng: float) -> dict[str, Any]:
 
     # 1. Reverse Geocoding via Nominatim
     try:
-        with httpx.Client(timeout=4.0) as client:
-            resp = client.get(
-                NOMINATIM_URL,
-                params={
-                    "lat": lat,
-                    "lon": lng,
-                    "format": "jsonv2",
-                    "zoom": 18,
-                    "addressdetails": 1,
-                    "extratags": 1,
-                },
-                headers=headers,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                if "address" in data:
-                    addr = data["address"]
-                    country = addr.get("country", country)
-                    state = addr.get("state") or addr.get("region") or addr.get("state_district") or ""
-                    city = addr.get("city") or addr.get("town") or addr.get("municipality") or addr.get("county") or ""
-                    suburb_village = addr.get("suburb") or addr.get("village") or addr.get("neighbourhood") or addr.get("hamlet") or ""
-                    display_name = data.get("display_name", display_name)
-                    location_type = data.get("category", "") or data.get("type", "Localidade")
-    except Exception as err:
-        logger.warning("Falha ao consultar Nominatim: %s", err)
+        data = fetch_json(
+            NOMINATIM_URL, timeout=4, max_bytes=128_000, headers=headers,
+            params={"lat": lat, "lon": lng, "format": "jsonv2", "zoom": 18,
+                    "addressdetails": 1, "extratags": 1},
+        )
+        addr = data.get("address") if isinstance(data, dict) else None
+        if isinstance(addr, dict):
+            addr = {key: value for key, value in addr.items() if isinstance(value, str)}
+            data = {key: value for key, value in data.items() if isinstance(value, str)}
+            country = addr.get("country", country)
+            state = addr.get("state") or addr.get("region") or addr.get("state_district") or ""
+            city = addr.get("city") or addr.get("town") or addr.get("municipality") or addr.get("county") or ""
+            suburb_village = addr.get("suburb") or addr.get("village") or addr.get("neighbourhood") or addr.get("hamlet") or ""
+            display_name = data.get("display_name", display_name)
+            location_type = data.get("category", "") or data.get("type", "Localidade")
+    except SourceUnavailable:
+        logger.warning("Falha ao consultar Nominatim")
 
     # 2. Consulta Overpass API para empresas/POIs próximos
     companies_and_pois: list[dict[str, str]] = []
@@ -66,19 +59,21 @@ def get_location_info(lat: float, lng: float) -> dict[str, Any]:
         );
         out body 15;
         """
-        with httpx.Client(timeout=3.5) as client:
-            resp = client.post(OVERPASS_URL, data={"data": query}, headers=headers)
-            if resp.status_code == 200:
-                elements = resp.json().get("elements", [])
-                nearby_businesses_count = len(elements)
-                for elem in elements:
-                    tags = elem.get("tags", {})
-                    name = tags.get("name") or tags.get("brand") or tags.get("office") or tags.get("shop") or tags.get("amenity")
-                    cat = tags.get("office") or tags.get("shop") or tags.get("amenity") or tags.get("building", "empresa/serviço")
-                    if name:
-                        companies_and_pois.append({"name": name, "category": str(cat)})
-    except Exception as err:
-        logger.warning("Falha ao consultar Overpass API: %s", err)
+        data = fetch_json(OVERPASS_URL, timeout=3.5, max_bytes=500_000,
+                          data={"data": query}, headers=headers)
+        elements = data.get("elements") if isinstance(data, dict) else None
+        if isinstance(elements, list):
+            nearby_businesses_count = len(elements)
+            for elem in elements[:15]:
+                tags = elem.get("tags") if isinstance(elem, dict) else None
+                if not isinstance(tags, dict):
+                    continue
+                name = tags.get("name") or tags.get("brand") or tags.get("office") or tags.get("shop") or tags.get("amenity")
+                cat = tags.get("office") or tags.get("shop") or tags.get("amenity") or tags.get("building", "empresa/serviço")
+                if isinstance(name, str):
+                    companies_and_pois.append({"name": name, "category": str(cat)})
+    except SourceUnavailable:
+        logger.warning("Falha ao consultar Overpass API")
 
     # Se a API de POIs não retornar nomes específicos ou se falhar, simula estimativa coerente baseada no tipo de zona
     if not companies_and_pois and city:

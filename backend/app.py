@@ -27,7 +27,7 @@ if str(ROOT) not in sys.path:
 from python.gps_core import AutomationEngine, Geofence, Position, distance_meters  # noqa: E402
 from python.settings import Settings  # noqa: E402
 from backend.storage import GeofenceStore  # noqa: E402
-from backend.source_clients import SourceUnavailable, fetch_celestrak, fetch_opensky, fetch_text, parse_tle_text  # noqa: E402
+from backend.source_clients import SourceUnavailable, fetch_celestrak, fetch_json, fetch_opensky, fetch_text, parse_tle_text  # noqa: E402
 from backend.alerts import send_webhook  # noqa: E402
 from backend.routing import bicycle_route  # noqa: E402
 from backend.orbits import propagate_tle  # noqa: E402
@@ -441,7 +441,7 @@ def create_geofence(payload: GeofenceInput) -> dict[str, object]:
 
 @app.get("/api/geofences")
 def list_geofences() -> list[dict[str, object]]:
-    return [asdict(fence) for fence, _ in geofences.values()]
+    return [asdict(fence) for fence, _ in geofences.copy().values()]
 
 
 @app.delete("/api/geofences/{name}")
@@ -479,8 +479,6 @@ def map_features(
     radius: int = Query(default=500, ge=100, le=1500),
 ) -> dict[str, Any]:
     """Busca elementos cartográficos públicos do OpenStreetMap próximos a um ponto."""
-    import httpx
-
     query = f"""
     [out:json][timeout:12];
     (
@@ -497,15 +495,12 @@ def map_features(
     out center tags 100;
     """
     try:
-        response = httpx.post(
-            "https://overpass-api.de/api/interpreter",
+        payload = fetch_json(
+            "https://overpass-api.de/api/interpreter", timeout=15, max_bytes=1_500_000,
             data={"data": query},
-            timeout=15.0,
             headers={"User-Agent": "SentinelAtlas/0.1 (public map features)"},
         )
-        response.raise_for_status()
-        payload = response.json()
-    except (httpx.HTTPError, ValueError) as error:
+    except SourceUnavailable as error:
         raise HTTPException(
             status_code=503,
             detail="Dados cartográficos temporariamente indisponíveis; tente novamente mais tarde.",
@@ -575,7 +570,7 @@ def location_info(lat: float, lng: float) -> dict[str, Any]:
 @app.post("/api/ai/analyze")
 def ai_analyze(payload: AIAnalyzeInput) -> dict[str, Any]:
     # Se nenhuma geofence for fornecida na requisição, usa as cadastradas no backend
-    fences = payload.geofences or [asdict(fence) for fence, _ in geofences.values()]
+    fences = payload.geofences or [asdict(fence) for fence, _ in geofences.copy().values()]
     return ai_analyzer.analyze_situation(payload.assets, fences)
 
 
@@ -583,7 +578,7 @@ def ai_analyze(payload: AIAnalyzeInput) -> dict[str, Any]:
 def ai_query(payload: AIQueryInput) -> dict[str, Any]:
     ctx = payload.context
     if "geofences" not in ctx:
-        ctx["geofences"] = [asdict(fence) for fence, _ in geofences.values()]
+        ctx["geofences"] = [asdict(fence) for fence, _ in geofences.copy().values()]
     return ai_analyzer.query_copilot(payload.question, ctx)
 
 
@@ -692,7 +687,7 @@ async def positions(websocket: WebSocket) -> None:
             await asyncio.to_thread(store.save_position, position)
             events = []
             notifications = []
-            for fence, engine in geofences.values():
+            for fence, engine in geofences.copy().values():
                 event = engine.process(position)
                 events.append({
                     "geofence": fence.name,

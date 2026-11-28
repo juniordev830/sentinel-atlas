@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import json
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener
+
+from backend.source_clients import NoRedirect
+
+urlopen = build_opener(NoRedirect()).open
 
 
 def send_webhook(url: str | None, event: dict[str, object]) -> bool:
@@ -13,7 +17,7 @@ def send_webhook(url: str | None, event: dict[str, object]) -> bool:
     # Reject malformed/non-HTTP URLs without raising from urllib.urlopen.
     try:
         parsed = urlsplit(url)
-        if parsed.scheme not in ("https", "http") or not parsed.hostname:
+        if parsed.scheme not in ("https", "http") or not parsed.hostname or parsed.username is not None:
             return False
         # Accessing .port validates malformed or out-of-range port numbers.
         _ = parsed.port

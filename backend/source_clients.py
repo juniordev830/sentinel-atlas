@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from urllib.parse import urlsplit
+from threading import BoundedSemaphore
+from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
@@ -12,6 +13,7 @@ class SourceUnavailable(RuntimeError):
 
 
 MAX_SOURCE_BYTES = 16 * 1024 * 1024
+_source_slots = BoundedSemaphore(16)
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -22,35 +24,45 @@ class NoRedirect(HTTPRedirectHandler):
 source_opener = build_opener(NoRedirect())
 
 
-def _fetch_bytes(url: str, timeout: float) -> bytes:
+def _fetch_bytes(url: str, timeout: float, *, max_bytes: int, params=None, data=None, headers=None) -> bytes:
+    if not _source_slots.acquire(blocking=False):
+        raise SourceUnavailable("Limite de consultas externas simultâneas atingido")
     try:
         parsed = urlsplit(url)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username is not None:
             raise ValueError("URL de fonte inválida")
-        request = Request(url, headers={"User-Agent": "Sentinel-Atlas/0.1", "Accept-Encoding": "identity"})
+        if params:
+            url = parsed._replace(query=urlencode(params)).geturl()
+        request = Request(url, data=urlencode(data).encode("utf-8") if data is not None else None,
+                          headers={"User-Agent": "Sentinel-Atlas/0.1", **(headers or {}),
+                                   "Accept-Encoding": "identity"})
         with source_opener.open(request, timeout=timeout) as response:
             length = response.headers.get("Content-Length")
-            if length is not None and int(length) > MAX_SOURCE_BYTES:
+            if length is not None and int(length) > max_bytes:
                 raise ValueError("Tamanho anunciado acima do limite")
-            data = response.read(MAX_SOURCE_BYTES + 1)
-            if len(data) > MAX_SOURCE_BYTES:
+            data = response.read(max_bytes + 1)
+            if len(data) > max_bytes:
                 raise ValueError("Resposta acima do limite")
             return data
     except (OSError, ValueError) as error:
         raise SourceUnavailable("Fonte externa indisponível ou resposta inválida") from error
+    finally:
+        _source_slots.release()
 
 
-def fetch_json(url: str, timeout: float = 10) -> object:
-    data = _fetch_bytes(url, timeout)
+def fetch_json(url: str, timeout: float = 10, *, max_bytes: int | None = None,
+               params=None, data=None, headers=None) -> object:
+    body = _fetch_bytes(url, timeout, max_bytes=MAX_SOURCE_BYTES if max_bytes is None else max_bytes,
+                        params=params, data=data, headers=headers)
     try:
-        return json.loads(data)
+        return json.loads(body)
     except (ValueError, RecursionError) as error:
         raise SourceUnavailable("Resposta JSON inválida") from error
 
 
 def fetch_text(url: str, timeout: float = 10) -> str:
     try:
-        return _fetch_bytes(url, timeout).decode("utf-8")
+        return _fetch_bytes(url, timeout, max_bytes=MAX_SOURCE_BYTES).decode("utf-8")
     except UnicodeDecodeError as error:
         raise SourceUnavailable("Resposta de texto inválida") from error
 

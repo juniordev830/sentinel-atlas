@@ -413,21 +413,17 @@ def test_aircraft_invalid_payload_is_reported(monkeypatch):
 
 @pytest.mark.parametrize("payload", [[], {"elements": None}, {"elements": {}}])
 def test_map_features_rejects_invalid_provider_envelope(monkeypatch, payload):
-    import httpx
     monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token=None))
-    monkeypatch.setattr(httpx, "post", lambda *args, **kwargs: httpx.Response(
-        200, json=payload, request=httpx.Request("POST", "https://example.test")))
+    monkeypatch.setattr(app_module, "fetch_json", lambda *args, **kwargs: payload)
     assert client.get("/api/map/features", params={"lat": 0, "lng": 0}).status_code == 503
 
 
 def test_map_features_skips_invalid_coordinates_and_tags(monkeypatch):
-    import httpx
     monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token=None))
     payload = {"elements": [None, {"lat": 91, "lon": 0}, {"lat": 0, "lon": "x"},
                             {"lat": False, "lon": 0}, {"lat": 0, "lon": 0, "tags": [1]},
                             {"lat": 0, "lon": 0, "tags": {"building": "yes"}, "id": 1}]}
-    monkeypatch.setattr(httpx, "post", lambda *args, **kwargs: httpx.Response(
-        200, json=payload, request=httpx.Request("POST", "https://example.test")))
+    monkeypatch.setattr(app_module, "fetch_json", lambda *args, **kwargs: payload)
     result = client.get("/api/map/features", params={"lat": 0, "lng": 0})
     assert result.status_code == 200
     assert result.json()["count"] == 1

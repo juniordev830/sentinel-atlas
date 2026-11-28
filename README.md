@@ -407,3 +407,11 @@ No seletor **Ótica**, escolha Natural (padrão), Monocromático, Fósforo verde
 O seletor **Textura** oferece Automática (HD no perfil Ultra), NASA 5,4K (solicita HD em Ultra ou Equilibrado) e Padrão. A opção HD usa a composição global de janeiro de 2004 com topografia e batimetria sombreadas da [NASA Earth Observatory — Blue Marble Next Generation](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/), de 5400 × 2700 pixels. Não é imagem em tempo real nem terreno geométrico detalhado de cidades. O globo começa enquadrado na América do Sul e tem atmosfera mais suave e relevo de iluminação menos exagerado.
 
 O navegador verifica suporte a texturas de pelo menos 5400 pixels, dimensões e carregamento CORS antes de solicitar a imagem ao globo. Em caso de falha, mantém a textura padrão; o perfil Econômico e o modo noturno também usam suas texturas existentes. A imagem vem do domínio oficial da NASA, com atribuição na tela. Não são usados tiles do Google fora de seus componentes oficiais. É necessária conexão para baixar os ativos externos; o uso de memória e a aparência precisam ser verificados em navegador real.
+
+### Cotas em múltiplos processos
+
+Os limites de login, WebSockets ativos e consultas externas são compartilhados entre processos que acessam o mesmo arquivo SQLite em disco local. O arquivo de cotas é criado ao lado do banco principal. Use `SENTINEL_LIMITS_DB_PATH` para indicar outro caminho no mesmo host. Monte o diretório em todos os trabalhadores. As reservas expiram após falha de processo.
+
+Para réplicas em hosts diferentes, aplique limites globais no proxy ou gateway da infraestrutura. SQLite neste projeto foi validado em disco local. O banco de sessões e o de posições também precisam de uma arquitetura apropriada antes da distribuição entre hosts.
+
+Para limitar o histórico, configure `SENTINEL_POSITION_RETENTION_LIMIT` e faça backup se precisar preservar registros históricos. O Compose encaminha essa variável para o contêiner.

@@ -8,6 +8,21 @@ O **Sentinel Atlas** reúne um núcleo de geolocalização em Python, uma API as
 
 > **Estado do projeto:** projeto em desenvolvimento. Algumas integrações dependem de chaves de API, serviços externos ou dependências opcionais. Consulte as seções abaixo antes de assumir que uma fonte está ativa.
 
+## Navegação da documentação
+
+| Assunto | Onde consultar |
+| --- | --- |
+| Código e estudo | [Engenharia reversa](docs/ENGENHARIA_REVERSA.md) |
+| Instalação e execução local | [Executar localmente](#executar-localmente) |
+| Componentes e fluxo de dados | [Arquitetura](#arquitetura) |
+| Integração com fontes geoespaciais | [Fontes de dados](DATA_SOURCES.md) |
+| Evolução do painel | [Evolução gráfica GEOINT](docs/EVOLUCAO_GRAFICA_GEOINT.md) |
+| Configuração do editor | [VS Code](VSCODE_SETUP.md) |
+| Testes e manutenção | [Guia de validação](docs/GUIA_DE_VALIDACAO.md) |
+| Cuidados com dados armazenados | [Retenção de posições GPS](#retenção-de-posições-gps-opt-in-com-backup-obrigatório) |
+
+Antes de interpretar um objeto do mapa como uma observação real, confira sua fonte, o timestamp e o estado da integração. A disponibilidade da API, o estado de um provedor e a atualidade de uma observação são verificações distintas. Para reproduzir problemas visuais sem credenciais externas, prefira a simulação de geofence e o globo independente.
+
 ## Visão geral
 
 - **Geofencing:** cálculo de distância e detecção de entrada/saída de áreas configuradas.
@@ -415,3 +430,9 @@ Os limites de login, WebSockets ativos e consultas externas são compartilhados 
 Para réplicas em hosts diferentes, aplique limites globais no proxy ou gateway da infraestrutura. SQLite neste projeto foi validado em disco local. O banco de sessões e o de posições também precisam de uma arquitetura apropriada antes da distribuição entre hosts.
 
 Para limitar o histórico, configure `SENTINEL_POSITION_RETENTION_LIMIT` e faça backup se precisar preservar registros históricos. O Compose encaminha essa variável para o contêiner.
+
+## Código e roteiro de estudo
+
+Como impedir que a indisponibilidade de uma fonte geográfica comprometa todas as camadas? O [guia de engenharia reversa](docs/ENGENHARIA_REVERSA.md) reúne o mapa dos módulos e uma pergunta técnica baseada no projeto.
+
+Mantido por [João Junior](https://github.com/juniordev830).

@@ -11,5 +11,7 @@ RUN useradd --system --uid 10001 --home-dir /app --no-create-home atlas \
     && chown -R atlas:atlas /app
 USER atlas
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+    CMD ["python", "-c", "from http.client import HTTPConnection; c = HTTPConnection('127.0.0.1', 8000, timeout=2); c.request('GET', '/api/health'); raise SystemExit(c.getresponse().status != 200)"]
 # 0.0.0.0 is inside the container only. Compose publishes to 127.0.0.1.
 CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000", "--ws-max-size", "16384", "--ws-max-queue", "4"]

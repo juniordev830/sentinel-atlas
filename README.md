@@ -8,6 +8,20 @@ O **Sentinel Atlas** reúne um núcleo de geolocalização em Python, uma API as
 
 > **Estado do projeto:** projeto em desenvolvimento. Algumas integrações dependem de chaves de API, serviços externos ou dependências opcionais. Consulte as seções abaixo antes de assumir que uma fonte está ativa.
 
+## Navegação da documentação
+
+| Assunto | Onde consultar |
+| --- | --- |
+| Instalação e execução local | [Executar localmente](#executar-localmente) |
+| Componentes e fluxo de dados | [Arquitetura](#arquitetura) |
+| Integração com fontes geoespaciais | [Fontes de dados](DATA_SOURCES.md) |
+| Evolução do painel | [Evolução gráfica GEOINT](docs/EVOLUCAO_GRAFICA_GEOINT.md) |
+| Configuração do editor | [VS Code](VSCODE_SETUP.md) |
+| Testes e manutenção | [Guia de validação](docs/GUIA_DE_VALIDACAO.md) |
+| Cuidados com dados armazenados | [Retenção de posições GPS](#retenção-de-posições-gps-opt-in-com-backup-obrigatório) |
+
+Antes de interpretar um objeto do mapa como uma observação real, confira sua fonte, o timestamp e o estado da integração. A disponibilidade da API, o estado de um provedor e a atualidade de uma observação são verificações distintas. Para reproduzir problemas visuais sem credenciais externas, prefira a simulação de geofence e o globo independente.
+
 ## Visão geral
 
 - **Geofencing:** cálculo de distância e detecção de entrada/saída de áreas configuradas.

@@ -24,3 +24,17 @@ class SourceClientTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@patch("backend.source_clients.MAX_SOURCE_BYTES", 4)
+@patch("backend.source_clients.source_opener.open")
+def test_source_rejects_oversized_stream(open_source):
+    from backend.source_clients import SourceUnavailable, fetch_text
+    from pytest import raises
+
+    response = open_source.return_value.__enter__.return_value
+    response.headers = {}
+    response.read.return_value = b"12345"
+    with raises(SourceUnavailable):
+        fetch_text("https://source.example.test/data")
+    response.read.assert_called_once_with(5)

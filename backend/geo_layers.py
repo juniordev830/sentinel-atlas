@@ -84,8 +84,11 @@ def _request(url: str, *, params=None, headers=None, text=False):
             with client.stream("GET", url, params=params, headers={
                 "User-Agent": "SentinelAtlas/0.4 (geospatial public data)",
                 **(headers or {}),
+                "Accept-Encoding": "identity",
             }) as response:
                 response.raise_for_status()
+                if response.headers.get("Content-Encoding", "identity").lower() != "identity":
+                    raise SourceUnavailable("Codificação inesperada do provedor.")
                 payload = bytearray()
                 for chunk in response.iter_bytes(chunk_size=65_536):
                     if len(payload) + len(chunk) > 1_500_000:

@@ -413,22 +413,67 @@ def test_aircraft_invalid_payload_is_reported(monkeypatch):
 
 @pytest.mark.parametrize("payload", [[], {"elements": None}, {"elements": {}}])
 def test_map_features_rejects_invalid_provider_envelope(monkeypatch, payload):
-    import httpx
     monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token=None))
-    monkeypatch.setattr(httpx, "post", lambda *args, **kwargs: httpx.Response(
-        200, json=payload, request=httpx.Request("POST", "https://example.test")))
+    monkeypatch.setattr(app_module, "fetch_json", lambda *args, **kwargs: payload)
     assert client.get("/api/map/features", params={"lat": 0, "lng": 0}).status_code == 503
 
 
 def test_map_features_skips_invalid_coordinates_and_tags(monkeypatch):
-    import httpx
     monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token=None))
     payload = {"elements": [None, {"lat": 91, "lon": 0}, {"lat": 0, "lon": "x"},
                             {"lat": False, "lon": 0}, {"lat": 0, "lon": 0, "tags": [1]},
                             {"lat": 0, "lon": 0, "tags": {"building": "yes"}, "id": 1}]}
-    monkeypatch.setattr(httpx, "post", lambda *args, **kwargs: httpx.Response(
-        200, json=payload, request=httpx.Request("POST", "https://example.test")))
+    monkeypatch.setattr(app_module, "fetch_json", lambda *args, **kwargs: payload)
     result = client.get("/api/map/features", params={"lat": 0, "lng": 0})
     assert result.status_code == 200
     assert result.json()["count"] == 1
     assert result.json()["counts"]["buildings"] == 1
+
+
+def test_logout_revokes_copied_cookie_and_active_websocket(monkeypatch):
+    _configure_browser_auth(monkeypatch)
+    session = TestClient(app)
+    login = session.post("/api/session", json={"token": "test-browser-token"},
+                         headers={"Origin": "http://testserver"})
+    assert login.status_code == 200
+    cookie = login.cookies[app_module.SESSION_COOKIE_NAME]
+    with session.websocket_connect("/ws/positions", headers={"Origin": "http://testserver"}) as socket:
+        assert session.post("/api/session/logout").status_code == 200
+        replay = TestClient(app)
+        replay.cookies.set(app_module.SESSION_COOKIE_NAME, cookie)
+        assert replay.get("/api/geofences").status_code == 401
+        socket.send_json({"latitude": 0, "longitude": 0})
+        with pytest.raises(WebSocketDisconnect) as closing:
+            socket.receive_json()
+        assert closing.value.code == 1008
+
+
+def test_websocket_rate_limit_rejects_before_writing(monkeypatch):
+    monkeypatch.setattr(app_module, "settings", replace(app_module.settings, environment="test", api_token=None))
+    monkeypatch.setattr(app_module, "MAX_WS_POSITIONS_PER_WINDOW", 1)
+    monkeypatch.setattr(app_module, "WS_POSITION_WINDOW_SECONDS", 60)
+    saved = []
+    monkeypatch.setattr(app_module.store, "save_position", saved.append)
+    with TestClient(app).websocket_connect("/ws/positions") as socket:
+        position = {"latitude": 0, "longitude": 0}
+        socket.send_json(position)
+        assert socket.receive_json()["position"]["latitude"] == 0
+        socket.send_json(position)
+        with pytest.raises(WebSocketDisconnect) as closing:
+            socket.receive_json()
+        assert closing.value.code == 1008
+    assert len(saved) == 1
+
+
+def test_browser_login_attempts_are_limited(monkeypatch):
+    _configure_browser_auth(monkeypatch)
+    monkeypatch.setattr(app_module, "_login_window", -1)
+    monkeypatch.setattr(app_module, "_login_buckets", {})
+    monkeypatch.setattr(app_module, "_login_total", 0)
+    monkeypatch.setattr(app_module, "LOGIN_ATTEMPTS_PER_WINDOW", 2)
+    session = TestClient(app)
+    for expected in (401, 401, 429):
+        result = session.post("/api/session", json={"token": "test-invalid-token"},
+                              headers={"Origin": "http://testserver"})
+        assert result.status_code == expected
+    assert result.headers["Retry-After"] == "60"

@@ -1,6 +1,7 @@
 """Testes para o serviço e endpoint de inteligência de localização."""
 
 import unittest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from backend.app import app
 from backend.location import get_location_info
@@ -9,6 +10,9 @@ from backend.location import get_location_info
 class LocationTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        test_sources = patch("backend.location.fetch_json", return_value={})
+        self.addCleanup(test_sources.stop)
+        test_sources.start()
 
     def test_get_location_info_sp(self):
         info = get_location_info(-23.5505, -46.6333)
